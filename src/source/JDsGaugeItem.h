@@ -71,6 +71,7 @@ public:
     ,GAUGE_Swl
     ,GAUGE_MaxZ
     ,GAUGE_Force
+    ,GAUGE_Pres
   }TpGauge;
 
   ///Structure with default configuration for JGaugeItem objects.
@@ -465,6 +466,70 @@ public:
  #endif
 };
 
+
+//##############################################################################
+//# JGaugePressure
+//##############################################################################
+/// \brief Calculates pressure in fluid domain.
+class JGaugePressure : public JGaugeItem
+{
+public:
+  ///Structure with result of JGaugePressure object.
+  typedef struct StGaugePresRes{
+    double timestep;
+    tfloat3 point;
+    float pres;
+    bool modified;
+    StGaugePresRes(){ Reset(); }
+    void Reset(){
+      Set(0,TFloat3(0),0.0f);
+      modified=false;
+    }
+    void Set(double t,const tfloat3 &pt,const float pr){
+      timestep=t; point=pt; pres=pr; modified=true;
+    }
+  }StGaugePresRes;
+
+protected:
+  //-Definition.
+  tdouble3 Point;
+
+  StGaugePresRes Result; ///<Result of the last measure.
+
+  std::vector<StGaugePresRes> OutBuff; ///<Results in buffer.
+
+  void Reset();
+  void ClearResult(){ Result.Reset(); }
+  void StoreResult();
+
+public:
+  JGaugePressure(unsigned idx,std::string name,tdouble3 point,bool cpu);
+  ~JGaugePressure();
+
+  void SaveResults();
+  void SaveVtkResult(unsigned cpart);
+  unsigned GetPointDef(std::vector<tfloat3> &points)const;
+
+  tdouble3 GetPoint()const{ return(Point); }
+  const StGaugePresRes& GetResult()const{ return(Result); }
+
+  void SetPoint(const tdouble3 &point){ ClearResult(); Point=point; }
+
+  template<TpKernel tker> void CalculeCpuT(double timestep,const StDivDataCpu &dvd
+    ,unsigned npbok,unsigned npb,unsigned np,const tdouble3 *pos
+    ,const typecode *code,const unsigned *idp,const tfloat4 *velrhop);
+
+   void CalculeCpu(double timestep,const StDivDataCpu &dvd
+    ,unsigned npbok,unsigned npb,unsigned np,const tdouble3 *pos
+    ,const typecode *code,const unsigned *idp,const tfloat4 *velrhop);
+
+ #ifdef _WITHGPU
+  void CalculeGpu(double timestep,const StDivDataGpu &dvd
+    ,unsigned npbok,unsigned npb,unsigned np,const double2 *posxy,const double *posz
+    ,const typecode *code,const unsigned *idp,const float4 *velrhop,float3 *aux);
+ #endif
+
+};
 
 #endif
 

@@ -177,6 +177,8 @@ public:
     ,tdouble3 point0,double height,float distlimit);
   JGaugeForce*    AddGaugeForce(std::string name,double computestart,double computeend,double computedt
     ,const JSphMk* mkinfo,word mkbound);
+  JGaugePressure* AddGaugePressure  (std::string name,double computestart,double computeend,double computedt
+    ,const tdouble3 &point);
 
   void SaveVtkInitPoints()const;
 

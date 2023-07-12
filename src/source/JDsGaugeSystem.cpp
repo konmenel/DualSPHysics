@@ -263,6 +263,10 @@ void JGaugeSystem::ReadXml(const JXml *sxml,TiXmlElement* lis,const JSphMk* mkin
           const word mkbound=(word)sxml->ReadElementUnsigned(ele,"target","mkbound");
           gau=AddGaugeForce(name,cfg.computestart,cfg.computeend,cfg.computedt,mkinfo,mkbound);
         }
+        if(cmd=="pressure"){
+          const tdouble3 point=sxml->ReadElementDouble3(ele,"point");
+          gau=AddGaugePressure(name,cfg.computestart,cfg.computeend,cfg.computedt,point);
+        }
         else Run_ExceptioonFile(fun::PrintStr("Gauge type \'%s\' is invalid.",cmd.c_str()),sxml->ErrGetFileRow(ele));
         gau->SetSaveVtkPart(cfg.savevtkpart);
         //gau->ConfigComputeTiming(cfg.computestart,cfg.computeend,cfg.computedt);
@@ -349,6 +353,24 @@ JGaugeForce* JGaugeSystem::AddGaugeForce(std::string name,double computestart
   const tfloat3 center=ToTFloat3((mkb->GetPosMin()+mkb->GetPosMax())/TDouble3(2));
   //-Creates object.
   JGaugeForce* gau=new JGaugeForce(GetCount(),name,mkbound,typeparts,idbegin,count,code,center,Cpu);
+  gau->Config(CSP,Symmetry,DomPosMin,DomPosMax,Scell,ScellDiv);
+  gau->ConfigComputeTiming(computestart,computeend,computedt);
+  //-Uses common configuration.
+  gau->SetSaveVtkPart(CfgDefault.savevtkpart);
+  gau->ConfigOutputTiming(CfgDefault.output,CfgDefault.outputstart,CfgDefault.outputend,CfgDefault.outputdt);
+  Gauges.push_back(gau);
+  return(gau);
+}
+
+//==============================================================================
+/// Creates new gauge-Pressure and returns pointer.
+//==============================================================================
+JGaugePressure* JGaugeSystem::AddGaugePressure(std::string name,double computestart
+  ,double computeend,double computedt,const tdouble3 &point)
+{
+  if(GetGaugeIdx(name)!=UINT_MAX)Run_Exceptioon(fun::PrintStr("The name \'%s\' already exists.",name.c_str()));
+  //-Creates object.
+  JGaugePressure* gau=new JGaugePressure(GetCount(),name,point,Cpu);
   gau->Config(CSP,Symmetry,DomPosMin,DomPosMax,Scell,ScellDiv);
   gau->ConfigComputeTiming(computestart,computeend,computedt);
   //-Uses common configuration.

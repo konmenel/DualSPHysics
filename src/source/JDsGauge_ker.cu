@@ -394,6 +394,88 @@ void Interaction_GaugeForce(const StCteSph &CSP,const StDivDataGpu &dvd
     }
   }
 }
+//------------------------------------------------------------------------------
+/// Calculates pressure in indicated point.
+//------------------------------------------------------------------------------
+template<TpKernel tker> __global__ void KerInteractionGaugePres(float aker,double3 ptpos
+  ,int scelldiv,int4 nc,int3 cellzero,const int2 *beginendcellfluid
+  ,unsigned axis,unsigned cellcode,double3 domposmin,float scell,float poscellsize
+  ,float kernelsize2,float kernelh,float massf
+  ,const double2 *posxy,const double *posz,const typecode *code
+  ,float cteb,float rhopzero,float gamma,float cs0,const float4 *velrhop
+  ,float3 *ptpres)
+{
+  unsigned p=blockIdx.x*blockDim.x + threadIdx.x; //-Number of particle
+  if(!p){
+    const double px=ptpos.x;
+    const double py=ptpos.y;
+    const double pz=ptpos.z;
+
+    double sumwab=0;
+    float sumpres=0.0f;
+
+    //-Obtains neighborhood search limits.
+    int ini1,fin1,ini2,fin2,ini3,fin3;
+    cunsearch::Initsp(px,py,pz,axis,domposmin,scell,scelldiv,nc,cellzero,ini1,fin1,ini2,fin2,ini3,fin3);
+
+    //-Interaction with fluids.
+    //ini3+=cellfluid; fin3+=cellfluid; //cellfluid is included in *beginendcellfluid.
+    for(int c3=ini3;c3<fin3;c3+=nc.w)for(int c2=ini2;c2<fin2;c2+=nc.x){
+      unsigned pini,pfin=0;  cunsearch::ParticleRange(c2,c3,ini1,fin1,beginendcellfluid,pini,pfin);
+      if(pfin)for(int p2=pini;p2<pfin;p2++){
+        const double2 pxyp2=posxy[p2];
+        const float drx=float(px-pxyp2.x);
+        const float dry=float(py-pxyp2.y);
+        const float drz=float(pz-posz[p2]);
+        const float rr2=(drx*drx + dry*dry + drz*drz);
+        //-Interaction with real neighboring fluid particles.
+        if(rr2<=kernelsize2 && rr2>=ALMOSTZERO && CODE_IsFluid(code[p2])){
+          float wab=cufsph::GetKernel_Wab<tker>(rr2,kernelh,aker);
+          const float rhop2=velrhop[p2].w;
+          const float press2=cufsph::ComputePress(rhop2,rhopzero,cteb,gamma,cs0);
+
+          wab*=massf/velrhop[p2].w;
+          sumwab+=wab;
+          sumpres+=wab*press2;
+
+        }
+      }
+    }
+    //-Applies kernel correction.
+    if(sumwab){
+     sumpres/=sumwab;
+    }
+    //-Stores result. | Guarda resultado.
+    ptpres[0]=make_float3(sumpres,0,0);
+  }
+}
+//==============================================================================
+/// Calculates pressure in indicated point.
+//==============================================================================
+void Interaction_GaugePres(const StCteSph &CSP,const StDivDataGpu &dvd,tdouble3 ptpos
+  ,const double2 *posxy,const double *posz,const typecode *code
+  ,const float4 *velrhop,float3 *ptpres)
+  //,tdouble3 domposmin,float scell,float kernelsize2,float h,float massf)
+{
+  //-Interaction Fluid-Fluid & Fluid-Bound.
+  const int2 *beginendcellfluid=dvd.beginendcell+dvd.cellfluid;
+  const unsigned bsize=32;
+  dim3 sgrid=GetSimpleGridSize(1,bsize);
+  //:JDgKerPrint info;
+  //:byte* ik=NULL; //info.GetInfoPointer(sgridf,bsfluid);
+  switch(CSP.tkernel){
+    case KERNEL_Cubic:   //Kernel Cubic is not available.
+    case KERNEL_Wendland:{ const float aker=CSP.kwend.awen;
+      KerInteractionGaugePres<KERNEL_Wendland> <<<sgrid,bsize>>> (aker,Double3(ptpos)
+        ,dvd.scelldiv,dvd.nc,dvd.cellzero,beginendcellfluid
+        ,dvd.axis,dvd.domcellcode,dvd.domposmin,dvd.scell,dvd.poscellsize
+        ,dvd.kernelsize2,CSP.kernelh,CSP.massfluid,posxy,posz,code
+        ,CSP.cteb,CSP.rhopzero,CSP.gamma,float(CSP.cs0),velrhop,ptpres);
+    }break;
+    default: throw "Kernel unknown at Interaction_GaugeVel().";
+  }
+  //:info.PrintValuesFull(true); //info.PrintValuesInfo();
+}
 
 
 }

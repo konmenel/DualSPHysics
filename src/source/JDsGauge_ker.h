@@ -51,6 +51,11 @@ void Interaction_GaugeForce(const StCteSph &CSP,const StDivDataGpu &dvd
   ,const typecode *code,const unsigned *idp,const float4 *velrhop
   ,float3 *partace);
 
+//-Kernel for JGaugePressure.
+void Interaction_GaugePres(const StCteSph &CSP,const StDivDataGpu &dvd,tdouble3 ptpos
+  ,const double2 *posxy,const double *posz,const typecode *code
+  ,const float4 *velrhop,float3 *ptpres);
+
 
 }
 

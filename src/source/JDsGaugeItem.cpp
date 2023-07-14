@@ -175,6 +175,8 @@ void JGaugeItem::GetConfig(std::vector<std::string> &lines)const{
   if(Type==GAUGE_Pres){
     const JGaugePressure* gau=(JGaugePressure*)this;
     lines.push_back(fun::PrintStr("Point......: (%g,%g,%g)",gau->GetPoint().x,gau->GetPoint().y,gau->GetPoint().z));
+    if(gau->GetActiveLink())
+      lines.push_back(fun::PrintStr("Link......: MkBound=%u (%s particles)",gau->GetMkBound(),TpPartGetStrCode(gau->GetTypeParts())));
   }
   else Run_Exceptioon("Type unknown.");
 }
@@ -1097,13 +1099,24 @@ void JGaugeForce::CalculeGpu(double timestep,const StDivDataGpu &dvd
 //==============================================================================
 /// Constructor.
 //==============================================================================
-JGaugePressure::JGaugePressure(unsigned idx,std::string name,tdouble3 point,bool cpu)
+JGaugePressure::JGaugePressure(unsigned idx,std::string name,tdouble3 point
+  ,bool activelink,word mkbound,TpParticles typeparts,const StFloatingData *ftobj
+  ,const StMotionData* motobj,bool cpu)
   :JGaugeItem(GAUGE_Pres,idx,name,cpu)
 {
   ClassName="JGaugePres";
   FileInfo=string("Saves pressure data measured from fluid particles (by ")+ClassName+").";
   Reset();
   SetPoint(point);
+  ActiveLink=activelink;
+  MkBound=mkbound;
+  TypeParts=typeparts;
+  FtObj=ftobj;
+  MotObj=motobj;
+  RelDist=TDouble3(0);
+  if(activelink && typeparts==TpPartFloating) RelDist=point-ftobj->center;
+
+  if(activelink && (motobj==NULL && ftobj==NULL))Run_Exceptioon("Both floating and motion pointers are null but link is active");
 }
 
 //==============================================================================
@@ -1119,6 +1132,12 @@ JGaugePressure::~JGaugePressure(){
 //==============================================================================
 void JGaugePressure::Reset(){
   SetPoint(TDouble3(0));
+  ActiveLink=false;
+  MkBound=0;
+  TypeParts=TpPartUnknown;
+  FtObj=NULL;
+  MotObj=NULL;
+  RelDist=TDouble3(0);
   JGaugeItem::Reset();
 }
 
@@ -1202,6 +1221,7 @@ template<TpKernel tker> void JGaugePressure::CalculeCpuT(double timestep
   //-Start measure.
   float ptpres=0.0f;
   const bool ptout=PointIsOut(Point.x,Point.y,Point.z);//-Verify that the point is within domain boundaries. | Comprueba que el punto este dentro de limites del dominio.
+
   if(!ptout){
     //-Auxiliary variables.
     double sumwab=0;
@@ -1236,6 +1256,7 @@ template<TpKernel tker> void JGaugePressure::CalculeCpuT(double timestep
   //Log->Printf("------> t:%f",TimeStep);
   if(Output(timestep))StoreResult();
 }
+
 //==============================================================================
 /// Calculates velocity at indicated points (on CPU).
 //==============================================================================
@@ -1274,5 +1295,46 @@ void JGaugePressure::CalculeGpu(double timestep,const StDivDataGpu &dvd
 }
 #endif
 
+//==============================================================================
+/// Updates the location of the point if a link is active.
+//==============================================================================
+void JGaugePressure::UpdateLinkPoint(){
+  if(ActiveLink){
+    switch (TypeParts)
+    {
+    case TpPartFloating:{
+      tfloat3 angles = FtObj->angles;
+      tdouble3 center = FtObj->center;
+      tmatrix3f rotmat = fmath::RotMatrix3x3(angles);
+      tmatrix4d mat = TMatrix4d(
+        rotmat.a11, rotmat.a12, rotmat.a13, center.x,
+        rotmat.a21, rotmat.a22, rotmat.a23, center.y,
+        rotmat.a31, rotmat.a32, rotmat.a33, center.z,
+        0,          0,          0,          1
+      );
 
+      // mat.Move(FtObj->center);
+      tdouble3 p2 = MatrixMulPoint(mat,RelDist);
+      if(CSP.simulate2d)p2.y=0;
+      Point=p2;
+      break;
+    }
+    case TpPartMoving:{
+      if(MotObj->type==MOTT_Linear){//-Linear movement.
+        tdouble3 mov = MotObj->linmov;
+        tdouble3 p2 = Point + mov;
+        if(CSP.simulate2d)p2.y=0;
+        Point=p2;
+      }
+      if(MotObj->type==MOTT_Matrix){//-Matrix movement (for rotations).
+        tdouble3 p2 = MatrixMulPoint(MotObj->matmov, Point);
+        if(CSP.simulate2d)p2.y=0;
+        Point=p2;
+      }  
+      break;
+    }
+    default: Run_Exceptioon("Unsupported supported block type");
+    }
+  }
+}
 

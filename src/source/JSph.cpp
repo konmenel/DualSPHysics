@@ -2136,7 +2136,7 @@ void JSph::InitRun(unsigned np,const unsigned *idp,const tdouble3 *pos){
   //-Configuration of GaugeSystem.
   GaugeSystem->Config(CSP,Symmetry,TimeMax,TimePart,DomPosMin,DomPosMax,Scell,ScellDiv);
   if(xml.GetNodeSimple("case.execution.special.gauges",true))
-    GaugeSystem->LoadXml(&xml,"case.execution.special.gauges",MkInfo);
+    GaugeSystem->LoadXml(&xml,"case.execution.special.gauges",MkInfo,FtCount,FtObjs,DsMotion);
 
   //-Prepares WaveGen configuration.
   if(WaveGen){

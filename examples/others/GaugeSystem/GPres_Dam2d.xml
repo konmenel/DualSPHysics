@@ -33,29 +33,78 @@
                         <point x="0" y="-1" z="0" />
                         <size x="4" y="2" z="3" />
                     </drawbox>
+                    <setmkbound mk="1" />
+                    <drawbox>
+                        <boxfill>solid</boxfill>
+                        <point x="3" y="-1" z="0.05" />
+                        <size x="0.2" y="2" z="0.2" />
+                    </drawbox>
+                    <setmkbound mk="2" />
+                    <drawbox>
+                        <boxfill>solid</boxfill>
+                        <point x="2" y="-1" z="0.4" />
+                        <size x="0.2" y="2" z="0.2" />
+                    </drawbox>
                 </mainlist>
             </commands>
         </geometry>
+        <floatings>
+            <floating mkbound="1" rhopbody="1300" />
+        </floatings>
+        <motion>
+            <objreal ref="2">
+                <begin mov="1" start="0" />
+                <mvrect id="1" duration="1">
+                    <vel x="" y="0" z="0.5" units_comment="m/s" />
+                </mvrect>
+                <begin mov="2" start="0" />
+                <mvrot id="2" duration="1" anglesunits="degrees">
+                    <vel ang="90" units_comment="degrees/s" />
+                    <axisp1 x="2.1" y="0" z="0" />
+                    <axisp2 x="2.1" y="1" z="0" />
+                </mvrot>
+            </objreal>
+        </motion>
     </casedef>
     <execution>
         <special>
             <gauges>
                 <default>
-					<savevtkpart value="false" comment="Creates VTK files for each PART (default=false)" />
+                <savevtkpart value="false" comment="Creates VTK files for each PART (default=false)" />
                     <_computedt value="0.001" comment="Time between measurements. 0:all steps (default=TimeOut)" units_comment="s" />
                     <_computetime start="0.1" end="0.2" comment="Start and end of measures. (default=simulation time)" units_comment="s" />
-					<output value="true" comment="Creates CSV files of measurements (default=false)" />
+                <output value="true" comment="Creates CSV files of measurements (default=false)" />
                     <outputdt value="0" comment="Time between output measurements. 0:all steps (default=TimeOut)" units_comment="s" />
                     <outputtime start="0" end="10" comment="Start and end of output measures. (default=simulation time)" units_comment="s" />
                 </default>
-                <pressure name="PresPt">
-					<savevtkpart value="true" comment="Creates VTK files for each PART (default=default.savevtkpart)" />
+                <pressure name="PresPt1">
+                    <savevtkpart value="true" comment="Creates VTK files for each PART (default=default.savevtkpart)" />
                     <computedt value="0" comment="Time between measurements. 0:all steps (default=default.computedt)" units_comment="s" />
                     <computetime start="0" end="100" comment="Start and end of measures. (default=default.computetime)" units_comment="s" />
-					<output value="true" comment="Creates CSV files of measurements (default=default.output)" />
+                    <output value="true" comment="Creates CSV files of measurements (default=default.output)" />
                     <outputdt value="0" comment="Time between output measurements. 0:all steps (default=default.outputdt)" units_comment="s" />
                     <outputtime start="0" end="10" comment="Start and end of output measures. (default=default.outputtime)" units_comment="s" />
                     <point x="0.9" y="0" z="0.1" comment="Measuring position" units_comment="m" />
+                </pressure>
+                <pressure name="PresPt2">
+                    <savevtkpart value="true" comment="Creates VTK files for each PART (default=default.savevtkpart)" />
+                    <computedt value="0.001" comment="Time between measurements. 0:all steps (default=default.computedt)" units_comment="s" />
+                    <computetime start="0" end="100" comment="Start and end of measures. (default=default.computetime)" units_comment="s" />
+                    <output value="true" comment="Creates CSV files of measurements (default=default.output)" />
+                    <outputdt value="0.05" comment="Time between output measurements. 0:all steps (default=default.outputdt)" units_comment="s" />
+                    <outputtime start="0" end="10" comment="Start and end of output measures. (default=default.outputtime)" units_comment="s" />
+                    <point x="2.9" y="0" z="0.1" comment="Measuring position" units_comment="m" />
+                    <link mkbound="1" comment="The point will stay fixed relative to that boundary (i.e. if boundary is moving or floating)" />
+                </pressure>
+                <pressure name="PresPt3">
+                    <savevtkpart value="true" comment="Creates VTK files for each PART (default=default.savevtkpart)" />
+                    <_computedt value="0" comment="Time between measurements. 0:all steps (default=default.computedt)" units_comment="s" />
+                    <computetime start="0" end="100" comment="Start and end of measures. (default=default.computetime)" units_comment="s" />
+                    <output value="true" comment="Creates CSV files of measurements (default=default.output)" />
+                    <outputdt value="0" comment="Time between output measurements. 0:all steps (default=default.outputdt)" units_comment="s" />
+                    <outputtime start="0" end="10" comment="Start and end of output measures. (default=default.outputtime)" units_comment="s" />
+                    <point x="1.9" y="0" z="0.45" comment="Measuring position" units_comment="m" />
+                    <link mkbound="2" comment="The point will stay fixed relative to that boundary (i.e. if boundary is moving or floating)" />
                 </pressure>
             </gauges>
         </special>
@@ -67,7 +116,7 @@
             <parameter key="Visco" value="0.02" comment="Viscosity value" units_comment="m2/s" />
             <parameter key="ViscoBoundFactor" value="1" comment="Multiply viscosity value with boundary (default=1)" />
             <parameter key="DensityDT" value="0" comment="Density Diffusion Term 0:None, 1:Molteni, 2:Fourtakas, 3:Fourtakas(full) (default=0)" />
-			<parameter key="DensityDTvalue" value="0.1" comment="DDT value (default=0.1)" />
+            <parameter key="DensityDTvalue" value="0.1" comment="DDT value (default=0.1)" />
             <parameter key="Shifting" value="0" comment="Shifting mode 0:None, 1:Ignore bound, 2:Ignore fixed, 3:Full (default=0)" />
             <parameter key="ShiftCoef" value="-2" comment="Coefficient for shifting computation (default=-2)" />
             <parameter key="ShiftTFS" value="0" comment="Threshold to detect free surface. Typically 1.5 for 2D and 2.75 for 3D (default=0)" />
@@ -79,7 +128,7 @@
             <parameter key="DtFixed" value="0" comment="Fixed Dt value. Use 0 to disable (default=disabled)" units_comment="seconds" />
             <parameter key="DtFixedFile" value="NONE" comment="Dt values are loaded from file. Use NONE to disable (default=disabled)" units_comment="milliseconds (ms)" />
             <parameter key="DtAllParticles" value="0" comment="Velocity of particles used to calculate DT. 1:All, 0:Only fluid/floating (default=0)" />
-            <parameter key="TimeMax" value="0.72" comment="Time of simulation" units_comment="seconds" />
+            <parameter key="TimeMax" value="1.0" comment="Time of simulation" units_comment="seconds" />
             <parameter key="TimeOut" value="0.01" comment="Time out data" units_comment="seconds" />
             <parameter key="PartsOutMax" value="1" comment="Allowed %/100 of fluid particles out the domain (default=1)" units_comment="decimal" />
             <parameter key="RhopOutMin" value="700" comment="Minimum rhop valid (default=700)" units_comment="kg/m3" />

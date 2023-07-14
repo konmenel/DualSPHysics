@@ -72,6 +72,25 @@
 			<output value="true" comment="Creates CSV files of measurements (default=default.output)" />
 			<target mkbound="1" comment="Indicates the mkbound of selected particles to compute forces" />
 		</force>
+		<pressure name="PresPt1">
+			<savevtkpart value="true" comment="Creates VTK files for each PART (default=default.savevtkpart)" />
+			<computedt value="0" comment="Time between measurements. 0:all steps (default=default.computedt)" units_comment="s" />
+			<computetime start="0" end="100" comment="Start and end of measures. (default=default.computetime)" units_comment="s" />
+			<output value="true" comment="Creates CSV files of measurements (default=default.output)" />
+			<outputdt value="0" comment="Time between output measurements. 0:all steps (default=default.outputdt)" units_comment="s" />
+			<outputtime start="0" end="10" comment="Start and end of output measures. (default=default.outputtime)" units_comment="s" />
+			<point x="0.9" y="0" z="0.1" comment="Measuring position" units_comment="m" />
+		</pressure>
+		<pressure name="PresPt2">
+			<savevtkpart value="true" comment="Creates VTK files for each PART (default=default.savevtkpart)" />
+			<computedt value="0.001" comment="Time between measurements. 0:all steps (default=default.computedt)" units_comment="s" />
+			<computetime start="0" end="100" comment="Start and end of measures. (default=default.computetime)" units_comment="s" />
+			<output value="true" comment="Creates CSV files of measurements (default=default.output)" />
+			<outputdt value="0.05" comment="Time between output measurements. 0:all steps (default=default.outputdt)" units_comment="s" />
+			<outputtime start="0" end="10" comment="Start and end of output measures. (default=default.outputtime)" units_comment="s" />
+			<point x="2.9" y="0" z="0.1" comment="Measuring position" units_comment="m" />
+			<link mkbound="1" comment="The point will stay fixed relative to that boundary (i.e. if boundary is moving or floating)" />
+		</pressure>
 	</gauges>
 </special>
 <!-------------------------------------------------------------------------------------->

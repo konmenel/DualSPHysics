@@ -39,6 +39,7 @@
 #include <vector>
 #include "JObject.h"
 #include "DualSphDef.h"
+#include "JDsMotion.h"
 #include "JDsGaugeItem.h"
 
 class JXml;
@@ -143,7 +144,8 @@ private:
   void LoadLinePoints(unsigned count,const tdouble3 &point1,const tdouble3 &point2,std::vector<tdouble3> &points,const std::string &ref)const;
   void LoadPoints(JXml *sxml,TiXmlElement* lis,std::vector<tdouble3> &points)const;
   JGaugeItem::StDefault ReadXmlCommon(const JXml *sxml,TiXmlElement* ele)const;
-  void ReadXml(const JXml *sxml,TiXmlElement* ele,const JSphMk* mkinfo);
+  void ReadXml(const JXml *sxml,TiXmlElement* lis,const JSphMk* mkinfo
+    ,unsigned ftcount,const StFloatingData* ftobjs,const JDsMotion* dsmotion);
 
 public:
   JGaugeSystem(bool cpu);
@@ -153,7 +155,8 @@ public:
   void Config(const StCteSph &csp,bool symmetry,double timemax,double timepart
     ,tdouble3 posmin,tdouble3 posmax,float scell,int scelldiv);
 
-  void LoadXml(const JXml *sxml,const std::string &place,const JSphMk* mkinfo);
+  void LoadXml(const JXml *sxml,const std::string &place,const JSphMk* mkinfo
+    ,unsigned ftcount,const StFloatingData* ftobjs, const JDsMotion* dsmotion);
   void VisuConfig(std::string txhead,std::string txfoot);
 
   bool GetSimulate2D()const{ return(CSP.simulate2d); };
@@ -178,7 +181,7 @@ public:
   JGaugeForce*    AddGaugeForce(std::string name,double computestart,double computeend,double computedt
     ,const JSphMk* mkinfo,word mkbound);
   JGaugePressure* AddGaugePressure  (std::string name,double computestart,double computeend,double computedt
-    ,const tdouble3 &point);
+    ,const JSphMk* mkinfo,word mkbound,unsigned ftcount,const StFloatingData* ftobjs,const JDsMotion* dsmotion,const tdouble3 &point);
 
   void SaveVtkInitPoints()const;
 

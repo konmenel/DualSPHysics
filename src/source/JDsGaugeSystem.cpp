@@ -117,10 +117,11 @@ void JGaugeSystem::Config(const StCteSph & csp,bool symmetry,double timemax,doub
 //==============================================================================
 /// Loads initial conditions of XML object.
 //==============================================================================
-void JGaugeSystem::LoadXml(const JXml *sxml,const std::string &place,const JSphMk* mkinfo){
+void JGaugeSystem::LoadXml(const JXml *sxml,const std::string &place,const JSphMk* mkinfo
+  ,unsigned ftcount,const StFloatingData* ftobjs, const JDsMotion* dsmotion){
   TiXmlNode* node=sxml->GetNodeSimple(place);
   if(!node)Run_Exceptioon(std::string("Cannot find the element \'")+place+"\'.");
-  if(sxml->CheckNodeActive(node))ReadXml(sxml,node->ToElement(),mkinfo);
+  if(sxml->CheckNodeActive(node))ReadXml(sxml,node->ToElement(),mkinfo,ftcount,ftobjs,dsmotion);
 }
 
 //==============================================================================
@@ -201,7 +202,8 @@ JGaugeItem::StDefault JGaugeSystem::ReadXmlCommon(const JXml *sxml,TiXmlElement*
 //==============================================================================
 /// Reads list of initial conditions in the XML node.
 //==============================================================================
-void JGaugeSystem::ReadXml(const JXml *sxml,TiXmlElement* lis,const JSphMk* mkinfo){
+void JGaugeSystem::ReadXml(const JXml *sxml,TiXmlElement* lis,const JSphMk* mkinfo
+  ,unsigned ftcount,const StFloatingData* ftobjs,const JDsMotion* dsmotion){
   if(!Configured)Run_Exceptioon("The object is not yet configured.");
   //-Loads default configuration.
   ResetCfgDefault();
@@ -265,7 +267,8 @@ void JGaugeSystem::ReadXml(const JXml *sxml,TiXmlElement* lis,const JSphMk* mkin
         }
         if(cmd=="pressure"){
           const tdouble3 point=sxml->ReadElementDouble3(ele,"point");
-          gau=AddGaugePressure(name,cfg.computestart,cfg.computeend,cfg.computedt,point);
+          const word mkbound=(word)sxml->ReadElementUnsigned(ele,"link","mkbound",true,USHRT_MAX);
+          gau=AddGaugePressure(name,cfg.computestart,cfg.computeend,cfg.computedt,mkinfo,mkbound,ftcount,ftobjs,dsmotion,point);
         }
         else Run_ExceptioonFile(fun::PrintStr("Gauge type \'%s\' is invalid.",cmd.c_str()),sxml->ErrGetFileRow(ele));
         gau->SetSaveVtkPart(cfg.savevtkpart);
@@ -365,12 +368,41 @@ JGaugeForce* JGaugeSystem::AddGaugeForce(std::string name,double computestart
 //==============================================================================
 /// Creates new gauge-Pressure and returns pointer.
 //==============================================================================
-JGaugePressure* JGaugeSystem::AddGaugePressure(std::string name,double computestart
-  ,double computeend,double computedt,const tdouble3 &point)
+JGaugePressure* JGaugeSystem::AddGaugePressure(std::string name,double computestart,double computeend,double computedt
+  ,const JSphMk* mkinfo,word mkbound,unsigned ftcount,const StFloatingData* ftobjs,const JDsMotion* dsmotion,const tdouble3 &point)
 {
   if(GetGaugeIdx(name)!=UINT_MAX)Run_Exceptioon(fun::PrintStr("The name \'%s\' already exists.",name.c_str()));
+  bool activelink=(mkbound!=USHRT_MAX);
+  const StFloatingData* ftobj=NULL;
+  const StMotionData* motobj=NULL;
+  TpParticles typeparts=TpPartUnknown;
+  if(activelink){
+    const unsigned cmk=mkinfo->GetMkBlockByMkBound(mkbound);
+    if(cmk>=mkinfo->Size())Run_Exceptioon(fun::PrintStr("Error loading boundary objects. Mkbound=%u is unknown.",mkbound));
+    const JSphMkBlock* mkb=mkinfo->Mkblock(cmk);
+    typeparts=mkb->Type;
+    if(typeparts!=TpPartFloating && typeparts!=TpPartMoving && typeparts!=TpPartFixed)
+      Run_Exceptioon(fun::PrintStr("Type of boundary particles (Mkbound=%u) is invalid. Only floating or moving particles are allowed.",mkbound));
+    
+    if(typeparts==TpPartFixed){
+      activelink=false;
+      Log->PrintWarning(fun::PrintStr("Type of boundary particles (Mkbound=%u) is fixed. Link Ignored.",mkbound));
+    }
+    else if(typeparts==TpPartFloating) {
+      for(unsigned cf=0;cf<ftcount;cf++){
+        if(ftobjs[cf].mkbound==mkbound){
+          ftobj=&ftobjs[cf]; break;
+        }
+      }
+    }
+    else if(typeparts==TpPartMoving){
+      unsigned idx = dsmotion->GetObjIdxByMkBound(mkbound);
+      motobj = &(dsmotion->GetMotionData(idx));
+    }
+  }
+  
   //-Creates object.
-  JGaugePressure* gau=new JGaugePressure(GetCount(),name,point,Cpu);
+  JGaugePressure* gau=new JGaugePressure(GetCount(),name,point,activelink,mkbound,typeparts,ftobj,motobj,Cpu);
   gau->Config(CSP,Symmetry,DomPosMin,DomPosMax,Scell,ScellDiv);
   gau->ConfigComputeTiming(computestart,computeend,computedt);
   //-Uses common configuration.

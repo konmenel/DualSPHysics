@@ -35,6 +35,9 @@
 #include <vector>
 #include "JObject.h"
 #include "DualSphDef.h"
+#include "FunctionsMath.h"
+#include "JMatrix4.h"
+#include "JDsMotion.h"
 #include "JSaveCsv2.h"
 #include "JCellDivDataCpu.h"
 
@@ -162,8 +165,10 @@ public:
   double GetOutputStart()const{ return(OutputStart); }
   double GetOutputEnd()const{ return(OutputEnd); }
 
-  bool Update(double timestep)const{ return(timestep>=ComputeNext && ComputeStart<=timestep && timestep<=ComputeEnd); }
+  bool Update(double timestep){ this->UpdateLinkPoint(); return(timestep>=ComputeNext && ComputeStart<=timestep && timestep<=ComputeEnd); }
   bool Output(double timestep)const{ return(OutputSave && timestep>=OutputNext && OutputStart<=timestep && timestep<=OutputEnd); }
+
+  virtual void UpdateLinkPoint(){};
 
   virtual void CalculeCpu(double timestep,const StDivDataCpu &dvd
     ,unsigned npbok,unsigned npb,unsigned np,const tdouble3 *pos
@@ -493,6 +498,12 @@ public:
 protected:
   //-Definition.
   tdouble3 Point;
+  bool ActiveLink;              //True of link is valid (i.e. to floating or moving boudnary)
+  word MkBound;                 //<The mk value of the boundary
+  TpParticles TypeParts;        //<Type of the link particles (Floating or Moving)
+  tdouble3 RelDist;             //<Relative distance to floating (if link is to a floating)
+  const StFloatingData *FtObj;  //<The floating data structure (NULL if link is to moving boundary)
+  const StMotionData *MotObj;   //<The motions data structure (NULL if link is to floating body)
 
   StGaugePresRes Result; ///<Result of the last measure.
 
@@ -503,7 +514,9 @@ protected:
   void StoreResult();
 
 public:
-  JGaugePressure(unsigned idx,std::string name,tdouble3 point,bool cpu);
+  JGaugePressure(unsigned idx,std::string name,tdouble3 point
+    ,bool islink,word mkbound,TpParticles typeparts,const StFloatingData *ftobj
+    ,const StMotionData* motobj,bool cpu);
   ~JGaugePressure();
 
   void SaveResults();
@@ -511,9 +524,13 @@ public:
   unsigned GetPointDef(std::vector<tfloat3> &points)const;
 
   tdouble3 GetPoint()const{ return(Point); }
+  bool     GetActiveLink()const{ return(ActiveLink); }
+  word     GetMkBound()   const{ return(MkBound); }
+  TpParticles GetTypeParts()const{ return(TypeParts); }
   const StGaugePresRes& GetResult()const{ return(Result); }
 
   void SetPoint(const tdouble3 &point){ ClearResult(); Point=point; }
+  void UpdateLinkPoint()override;
 
   template<TpKernel tker> void CalculeCpuT(double timestep,const StDivDataCpu &dvd
     ,unsigned npbok,unsigned npb,unsigned np,const tdouble3 *pos

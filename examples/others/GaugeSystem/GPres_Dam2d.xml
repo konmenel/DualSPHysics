@@ -70,10 +70,10 @@
         <special>
             <gauges>
                 <default>
-                <savevtkpart value="false" comment="Creates VTK files for each PART (default=false)" />
+                    <savevtkpart value="false" comment="Creates VTK files for each PART (default=false)" />
                     <_computedt value="0.001" comment="Time between measurements. 0:all steps (default=TimeOut)" units_comment="s" />
                     <_computetime start="0.1" end="0.2" comment="Start and end of measures. (default=simulation time)" units_comment="s" />
-                <output value="true" comment="Creates CSV files of measurements (default=false)" />
+                    <output value="true" comment="Creates CSV files of measurements (default=false)" />
                     <outputdt value="0" comment="Time between output measurements. 0:all steps (default=TimeOut)" units_comment="s" />
                     <outputtime start="0" end="10" comment="Start and end of output measures. (default=simulation time)" units_comment="s" />
                 </default>
@@ -103,7 +103,7 @@
                     <output value="true" comment="Creates CSV files of measurements (default=default.output)" />
                     <outputdt value="0" comment="Time between output measurements. 0:all steps (default=default.outputdt)" units_comment="s" />
                     <outputtime start="0" end="10" comment="Start and end of output measures. (default=default.outputtime)" units_comment="s" />
-                    <point x="1.9" y="0" z="0.45" comment="Measuring position" units_comment="m" />
+                    <point x="1.9" y="0" z="0.42" comment="Measuring position" units_comment="m" />
                     <link mkbound="2" comment="The point will stay fixed relative to that boundary (i.e. if boundary is moving or floating)" />
                 </pressure>
             </gauges>

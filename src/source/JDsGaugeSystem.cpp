@@ -268,7 +268,7 @@ void JGaugeSystem::ReadXml(const JXml *sxml,TiXmlElement* lis,const JSphMk* mkin
         if(cmd=="pressure"){
           const tdouble3 point=sxml->ReadElementDouble3(ele,"point");
           const word mkbound=(word)sxml->ReadElementUnsigned(ele,"link","mkbound",true,USHRT_MAX);
-          gau=AddGaugePressure(name,cfg.computestart,cfg.computeend,cfg.computedt,mkinfo,mkbound,ftcount,ftobjs,dsmotion,point);
+          gau=AddGaugePressure(name,cfg.computestart,cfg.computeend,cfg.computedt,mkinfo,mkbound,point);
         }
         else Run_ExceptioonFile(fun::PrintStr("Gauge type \'%s\' is invalid.",cmd.c_str()),sxml->ErrGetFileRow(ele));
         gau->SetSaveVtkPart(cfg.savevtkpart);
@@ -369,12 +369,10 @@ JGaugeForce* JGaugeSystem::AddGaugeForce(std::string name,double computestart
 /// Creates new gauge-Pressure and returns pointer.
 //==============================================================================
 JGaugePressure* JGaugeSystem::AddGaugePressure(std::string name,double computestart,double computeend,double computedt
-  ,const JSphMk* mkinfo,word mkbound,unsigned ftcount,const StFloatingData* ftobjs,const JDsMotion* dsmotion,const tdouble3 &point)
+  ,const JSphMk* mkinfo,word mkbound,const tdouble3 &point)
 {
   if(GetGaugeIdx(name)!=UINT_MAX)Run_Exceptioon(fun::PrintStr("The name \'%s\' already exists.",name.c_str()));
   bool activelink=(mkbound!=USHRT_MAX);
-  const StFloatingData* ftobj=NULL;
-  const StMotionData* motobj=NULL;
   TpParticles typeparts=TpPartUnknown;
   if(activelink){
     const unsigned cmk=mkinfo->GetMkBlockByMkBound(mkbound);
@@ -388,21 +386,10 @@ JGaugePressure* JGaugeSystem::AddGaugePressure(std::string name,double computest
       activelink=false;
       Log->PrintWarning(fun::PrintStr("Type of boundary particles (Mkbound=%u) is fixed. Link Ignored.",mkbound));
     }
-    else if(typeparts==TpPartFloating) {
-      for(unsigned cf=0;cf<ftcount;cf++){
-        if(ftobjs[cf].mkbound==mkbound){
-          ftobj=&ftobjs[cf]; break;
-        }
-      }
-    }
-    else if(typeparts==TpPartMoving){
-      unsigned idx = dsmotion->GetObjIdxByMkBound(mkbound);
-      motobj = &(dsmotion->GetMotionData(idx));
-    }
   }
   
   //-Creates object.
-  JGaugePressure* gau=new JGaugePressure(GetCount(),name,point,activelink,mkbound,typeparts,ftobj,motobj,Cpu);
+  JGaugePressure* gau=new JGaugePressure(GetCount(),name,point,activelink,mkbound,typeparts,Cpu);
   gau->Config(CSP,Symmetry,DomPosMin,DomPosMax,Scell,ScellDiv);
   gau->ConfigComputeTiming(computestart,computeend,computedt);
   //-Uses common configuration.
@@ -506,6 +493,7 @@ void JGaugeSystem::CalculeCpu(double timestep,const StDivDataCpu &dvd
   const unsigned ng=GetCount();
   for(unsigned cg=0;cg<ng;cg++){
     JGaugeItem* gau=Gauges[cg];
+    gau->UpdateLinkPoint();
     if(gau->Update(timestep)){
       gau->CalculeCpu(timestep,dvd,npbok,npb,np,pos,code,idp,velrhop);
     }
@@ -540,6 +528,7 @@ void JGaugeSystem::CalculeGpu(double timestep,const StDivDataGpu &dvd
   const unsigned ng=GetCount();
   for(unsigned cg=0;cg<ng;cg++){
     JGaugeItem* gau=Gauges[cg];
+    gau->UpdateLinkPointGpu();
     if(gau->Update(timestep)){
       gau->CalculeGpu(timestep,dvd,npbok,npb,np,posxy,posz,code,idp,velrhop,AuxMemoryg);
     }
@@ -580,5 +569,27 @@ void JGaugeSystem::SaveResults(unsigned cpart){
   for(unsigned cg=0;cg<ng;cg++)Gauges[cg]->SaveResults(cpart);
 }
 
+//==============================================================================
+/// Configures the links for the gauges if link is active.
+//==============================================================================
+void JGaugeSystem::ConfigureLinks(unsigned ftcount,const StFloatingData* ftobjs,const JDsMotion* dsmotion){
+  const unsigned ng=GetCount();
+  for(unsigned cg=0;cg<ng;cg++){
+    JGaugeItem* gau=Gauges[cg];
+    gau->ConfigureLinks(ftcount,ftobjs,dsmotion);
+  }
+}
 
-
+#ifdef _WITHGPU
+//==============================================================================
+/// Configures the links for the gauges if link is active (on GPU).
+//==============================================================================
+void JGaugeSystem::ConfigureLinksGpu(unsigned ftcount,const StFloatingData* ftobjs,const double3* ftcenterg
+  ,const float3* ftanglesg,const JDsMotion* dsmotion){
+  const unsigned ng=GetCount();
+  for(unsigned cg=0;cg<ng;cg++){
+    JGaugeItem* gau=Gauges[cg];
+    gau->ConfigureLinksGpu(ftcount,ftobjs,ftcenterg,ftanglesg,dsmotion);
+  }
+}
+#endif

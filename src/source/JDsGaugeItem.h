@@ -165,10 +165,16 @@ public:
   double GetOutputStart()const{ return(OutputStart); }
   double GetOutputEnd()const{ return(OutputEnd); }
 
-  bool Update(double timestep){ this->UpdateLinkPoint(); return(timestep>=ComputeNext && ComputeStart<=timestep && timestep<=ComputeEnd); }
+  bool Update(double timestep)const{ return(timestep>=ComputeNext && ComputeStart<=timestep && timestep<=ComputeEnd); }
   bool Output(double timestep)const{ return(OutputSave && timestep>=OutputNext && OutputStart<=timestep && timestep<=OutputEnd); }
 
+  virtual void ConfigureLinks(unsigned ftcount,const StFloatingData* ftobjs,const JDsMotion* dsmotion){};
   virtual void UpdateLinkPoint(){};
+  #ifdef _WITHGPU
+  virtual void ConfigureLinksGpu(unsigned ftcount,const StFloatingData* ftobjs,const double3* ftcenterg
+    ,const float3* ftanglesg,const JDsMotion* dsmotion){};
+  virtual void UpdateLinkPointGpu(){};
+  #endif
 
   virtual void CalculeCpu(double timestep,const StDivDataCpu &dvd
     ,unsigned npbok,unsigned npb,unsigned np,const tdouble3 *pos
@@ -504,6 +510,10 @@ protected:
   tdouble3 RelDist;             //<Relative distance to floating (if link is to a floating)
   const StFloatingData *FtObj;  //<The floating data structure (NULL if link is to moving boundary)
   const StMotionData *MotObj;   //<The motions data structure (NULL if link is to floating body)
+  #ifdef _WITHGPU
+  const double3 *FtCenterg;
+  const float3 *FtAnglesg;
+  #endif
 
   StGaugePresRes Result; ///<Result of the last measure.
 
@@ -515,9 +525,16 @@ protected:
 
 public:
   JGaugePressure(unsigned idx,std::string name,tdouble3 point
-    ,bool islink,word mkbound,TpParticles typeparts,const StFloatingData *ftobj
-    ,const StMotionData* motobj,bool cpu);
+    ,bool activelink,word mkbound,TpParticles typeparts,bool cpu);
   ~JGaugePressure();
+
+  void ConfigureLinks(unsigned ftcount,const StFloatingData* ftobjs,const JDsMotion* dsmotion)override;
+  void UpdateLinkPoint()override;
+  #ifdef _WITHGPU
+  void ConfigureLinksGpu(unsigned ftcount,const StFloatingData* ftobjs,const double3* ftcenterg
+    ,const float3* ftanglesg,const JDsMotion* dsmotion)override;
+  void UpdateLinkPointGpu()override;
+  #endif
 
   void SaveResults();
   void SaveVtkResult(unsigned cpart);
@@ -530,7 +547,6 @@ public:
   const StGaugePresRes& GetResult()const{ return(Result); }
 
   void SetPoint(const tdouble3 &point){ ClearResult(); Point=point; }
-  void UpdateLinkPoint()override;
 
   template<TpKernel tker> void CalculeCpuT(double timestep,const StDivDataCpu &dvd
     ,unsigned npbok,unsigned npb,unsigned np,const tdouble3 *pos

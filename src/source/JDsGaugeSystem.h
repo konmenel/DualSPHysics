@@ -180,8 +180,14 @@ public:
     ,tdouble3 point0,double height,float distlimit);
   JGaugeForce*    AddGaugeForce(std::string name,double computestart,double computeend,double computedt
     ,const JSphMk* mkinfo,word mkbound);
-  JGaugePressure* AddGaugePressure  (std::string name,double computestart,double computeend,double computedt
-    ,const JSphMk* mkinfo,word mkbound,unsigned ftcount,const StFloatingData* ftobjs,const JDsMotion* dsmotion,const tdouble3 &point);
+  JGaugePressure* AddGaugePressure(std::string name,double computestart,double computeend,double computedt
+    ,const JSphMk* mkinfo,word mkbound,const tdouble3 &point);
+
+  void ConfigureLinks(unsigned ftcount,const StFloatingData* ftobjs,const JDsMotion* dsmotion);
+  #ifdef _WITHGPU
+  void ConfigureLinksGpu(unsigned ftcount,const StFloatingData* ftobjs,const double3* ftcenterg
+    ,const float3* ftanglesg,const JDsMotion* dsmotion);
+  #endif
 
   void SaveVtkInitPoints()const;
 

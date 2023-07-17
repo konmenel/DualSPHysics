@@ -1100,8 +1100,7 @@ void JGaugeForce::CalculeGpu(double timestep,const StDivDataGpu &dvd
 /// Constructor.
 //==============================================================================
 JGaugePressure::JGaugePressure(unsigned idx,std::string name,tdouble3 point
-  ,bool activelink,word mkbound,TpParticles typeparts,const StFloatingData *ftobj
-  ,const StMotionData* motobj,bool cpu)
+  ,bool activelink,word mkbound,TpParticles typeparts,bool cpu)
   :JGaugeItem(GAUGE_Pres,idx,name,cpu)
 {
   ClassName="JGaugePres";
@@ -1111,12 +1110,21 @@ JGaugePressure::JGaugePressure(unsigned idx,std::string name,tdouble3 point
   ActiveLink=activelink;
   MkBound=mkbound;
   TypeParts=typeparts;
-  FtObj=ftobj;
-  MotObj=motobj;
+  FtObj=NULL;
+  MotObj=NULL;
+  #ifdef _WITHGPU
+  FtCenterg=NULL;
+  FtAnglesg=NULL;
+  #endif
   RelDist=TDouble3(0);
+
+  /* ****TO BE MOVE TO DIFFERENT FUNCTION, SOMETHING LIKE "ConfigureLink"******
+   *
   if(activelink && typeparts==TpPartFloating) RelDist=point-ftobj->center;
 
   if(activelink && (motobj==NULL && ftobj==NULL))Run_Exceptioon("Both floating and motion pointers are null but link is active");
+  * *****************************************************************************
+  */
 }
 
 //==============================================================================
@@ -1137,6 +1145,10 @@ void JGaugePressure::Reset(){
   TypeParts=TpPartUnknown;
   FtObj=NULL;
   MotObj=NULL;
+  #ifdef _WITHGPU
+  FtCenterg=NULL;
+  FtAnglesg=NULL;
+  #endif
   RelDist=TDouble3(0);
   JGaugeItem::Reset();
 }
@@ -1271,6 +1283,84 @@ void JGaugePressure::CalculeCpu(double timestep,const StDivDataCpu &dvd
   }
 }
 
+//==============================================================================
+/// Sets the points to the floating or moving body link.
+//==============================================================================
+void JGaugePressure::ConfigureLinks(unsigned ftcount,const StFloatingData* ftobjs,const JDsMotion* dsmotion){
+  if (ActiveLink){
+    switch (TypeParts){
+    case TpPartFixed:{
+      ActiveLink=false;
+      FtObj=NULL;
+      MotObj=NULL;
+      break;
+    }
+    case TpPartFloating:{
+      MotObj=NULL;
+      unsigned cf=0;
+      for(;cf<ftcount;cf++){
+        if (ftobjs[cf].mkbound==MkBound){
+          FtObj=&(ftobjs[cf]);
+          RelDist = Point-ftobjs[cf].center;
+          break;
+        }
+      }
+      if (cf==ftcount) Run_Exceptioon(fun::PrintStr("Floating with mkbound=%u could not be found.",MkBound));
+      break;
+    }
+    case TpPartMoving:{
+      FtObj=NULL;
+      unsigned ref=0;
+      const unsigned nref=dsmotion->GetNumObjects();
+      for(;ref<nref;ref++){
+        const StMotionData& m=dsmotion->GetMotionData(ref);
+        if (m.mkbound==MkBound){
+          MotObj=&m;
+          break;
+        }
+      }
+      if (ref==nref) Run_Exceptioon(fun::PrintStr("Moving body with mkbound=%u could not be found.",MkBound));
+      break;
+    }
+    default: Run_Exceptioon("Unsupported supported block type");
+    }
+  }
+}
+
+//==============================================================================
+/// Updates the location of the point if a link is active.
+//==============================================================================
+void JGaugePressure::UpdateLinkPoint(){
+  if(ActiveLink){
+    if (TypeParts==TpPartFloating){
+      const tdouble3& center=FtObj->center;
+      tdouble3 angles=ToTDouble3(FtObj->angles);
+      tmatrix3d rot = fmath::RotMatrix3x3(angles);
+      tmatrix4d mat = TMatrix4d(
+        rot.a11, rot.a12, rot.a13, center.x,
+        rot.a21, rot.a22, rot.a23, center.y,
+        rot.a31, rot.a32, rot.a33, center.z,
+              0,       0,       0,        1);
+      tdouble3 p2 = MatrixMulPoint(mat, RelDist);
+      if(CSP.simulate2d)p2.y=0;
+      Point=p2;
+    }
+    else if (TypeParts==TpPartMoving){
+      if(MotObj->type==MOTT_Linear){//-Linear movement.
+        tdouble3 mov=MotObj->linmov;
+        tdouble3 p2=Point+mov;
+        if(CSP.simulate2d)p2.y=0;
+        Point=p2;
+      }
+      else if(MotObj->type==MOTT_Matrix){//-Matrix movement (for rotations).
+        tdouble3 p2 = MatrixMulPoint(MotObj->matmov, Point);
+        if(CSP.simulate2d)p2.y=0;
+        Point=p2;
+      }  
+    }
+  }
+}
+
 #ifdef _WITHGPU
 //==============================================================================
 /// Calculates velocity at indicated points (on GPU).
@@ -1293,44 +1383,50 @@ void JGaugePressure::CalculeGpu(double timestep,const StDivDataGpu &dvd
   //Log->Printf("------> t:%f",TimeStep);
   if(Output(timestep))StoreResult();
 }
-#endif
+
 
 //==============================================================================
-/// Updates the location of the point if a link is active.
+/// Sets the points to the floating or moving body link (on GPU).
 //==============================================================================
-void JGaugePressure::UpdateLinkPoint(){
-  if(ActiveLink){
-    switch (TypeParts)
-    {
+void JGaugePressure::ConfigureLinksGpu(unsigned ftcount,const StFloatingData* ftobjs,const double3* ftcenterg
+    ,const float3* ftanglesg,const JDsMotion* dsmotion){
+  if (ActiveLink){
+    switch (TypeParts){
+    case TpPartFixed:{
+      ActiveLink=false;
+      FtObj=NULL;
+      MotObj=NULL;
+      break;
+    }
     case TpPartFloating:{
-      tfloat3 angles = FtObj->angles;
-      tdouble3 center = FtObj->center;
-      tmatrix3f rotmat = fmath::RotMatrix3x3(angles);
-      tmatrix4d mat = TMatrix4d(
-        rotmat.a11, rotmat.a12, rotmat.a13, center.x,
-        rotmat.a21, rotmat.a22, rotmat.a23, center.y,
-        rotmat.a31, rotmat.a32, rotmat.a33, center.z,
-        0,          0,          0,          1
-      );
-
-      // mat.Move(FtObj->center);
-      tdouble3 p2 = MatrixMulPoint(mat,RelDist);
-      if(CSP.simulate2d)p2.y=0;
-      Point=p2;
+      MotObj=NULL;
+      unsigned cf=0;
+      for(;cf<ftcount;cf++){
+        if (ftobjs[cf].mkbound==MkBound){
+          FtObj=&(ftobjs[cf]);
+          FtCenterg=&(ftcenterg[cf]);
+          FtAnglesg=&(ftanglesg[cf]);
+          RelDist = Point-ftobjs[cf].center;
+          break;
+        }
+      }
+      if (cf==ftcount) Run_Exceptioon(fun::PrintStr("Floating with mkbound=%u could not be found.",MkBound));
       break;
     }
     case TpPartMoving:{
-      if(MotObj->type==MOTT_Linear){//-Linear movement.
-        tdouble3 mov = MotObj->linmov;
-        tdouble3 p2 = Point + mov;
-        if(CSP.simulate2d)p2.y=0;
-        Point=p2;
+      FtObj=NULL;
+      FtCenterg=NULL;
+      FtAnglesg=NULL;
+      unsigned ref=0;
+      const unsigned nref=dsmotion->GetNumObjects();
+      for(;ref<nref;ref++){
+        const StMotionData& m=dsmotion->GetMotionData(ref);
+        if (m.mkbound==MkBound){
+          MotObj=&m;
+          break;
+        }
       }
-      if(MotObj->type==MOTT_Matrix){//-Matrix movement (for rotations).
-        tdouble3 p2 = MatrixMulPoint(MotObj->matmov, Point);
-        if(CSP.simulate2d)p2.y=0;
-        Point=p2;
-      }  
+      if (ref==nref) Run_Exceptioon(fun::PrintStr("Moving body with mkbound=%u could not be found.",MkBound));
       break;
     }
     default: Run_Exceptioon("Unsupported supported block type");
@@ -1338,3 +1434,39 @@ void JGaugePressure::UpdateLinkPoint(){
   }
 }
 
+//==============================================================================
+/// Updates the location of the point if a link is active with Gpu.
+//==============================================================================
+void JGaugePressure::UpdateLinkPointGpu(){
+  if(ActiveLink){
+    if (TypeParts==TpPartFloating){
+      tdouble3 center=TDouble3(0);
+      tfloat3 angles=TFloat3(0);
+      cudaMemcpy(&center,FtCenterg,sizeof(double3),cudaMemcpyDeviceToHost);
+      cudaMemcpy(&angles,FtAnglesg,sizeof(float3),cudaMemcpyDeviceToHost);
+      tmatrix3d rot = fmath::RotMatrix3x3(ToTDouble3(angles));
+      tmatrix4d mat = TMatrix4d(
+        rot.a11, rot.a12, rot.a13, center.x,
+        rot.a21, rot.a22, rot.a23, center.y,
+        rot.a31, rot.a32, rot.a33, center.z,
+              0,       0,       0,        1);
+      tdouble3 p2 = MatrixMulPoint(mat, RelDist);
+      if(CSP.simulate2d)p2.y=0;
+      Point=p2;
+    }
+    else if (TypeParts==TpPartMoving){
+      if(MotObj->type==MOTT_Linear){//-Linear movement.
+        tdouble3 mov=MotObj->linmov;
+        tdouble3 p2=Point+mov;
+        if(CSP.simulate2d)p2.y=0;
+        Point=p2;
+      }
+      else if(MotObj->type==MOTT_Matrix){//-Matrix movement (for rotations).
+        tdouble3 p2 = MatrixMulPoint(MotObj->matmov, Point);
+        if(CSP.simulate2d)p2.y=0;
+        Point=p2;
+      }  
+    }
+  }
+}
+#endif

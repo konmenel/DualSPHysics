@@ -796,6 +796,7 @@ void JSphGpu::InitFloating(){
 void JSphGpu::InitRunGpu(){
   ParticlesDataDown(Np,0,false,false);
   InitRun(Np,Idp,AuxPos);
+  GaugeSystem->ConfigureLinksGpu(FtCount,FtObjs,FtoCenterg,FtoAnglesg,DsMotion);
 
   if(TStep==STEP_Verlet)cudaMemcpy(VelrhopM1g,Velrhopg,sizeof(float4)*Np,cudaMemcpyDeviceToDevice);
   if(TVisco==VISCO_LaminarSPS)cudaMemset(SpsTaug,0,sizeof(tsymatrix3f)*Np);

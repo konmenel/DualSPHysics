@@ -418,6 +418,7 @@ void JSphCpu::ConfigRunMode(){
 //==============================================================================
 void JSphCpu::InitRunCpu(){
   InitRun(Np,Idpc,Posc);
+  GaugeSystem->ConfigureLinks(FtCount,FtObjs,DsMotion);
 
   if(TStep==STEP_Verlet)memcpy(VelrhopM1c,Velrhopc,sizeof(tfloat4)*Np);
   if(TVisco==VISCO_LaminarSPS)memset(SpsTauc,0,sizeof(tsymatrix3f)*Np);

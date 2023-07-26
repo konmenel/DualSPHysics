@@ -275,6 +275,7 @@ void JSph::InitVars(){
   TimeStep=TimeStepM1=0;
   TimePartNext=0;
   LastDt=0;
+  memset(TimeSegL10, 0, sizeof(TimeSegL10));
 
   VerletStep=0;
   SymplecticDtPre=0;
@@ -2739,7 +2740,14 @@ void JSph::SaveData(unsigned npok,const JDataArrays& arrays
     double tseg=tpart/(TimeStep-TimeStepM1);
     TimerSim.Stop();
     double tcalc=TimerSim.GetElapsedTimeD()/1000;
-    double tleft=(tcalc/(TimeStep-TimeStepIni))*(TimeMax-TimeStep);
+    // double tleft=(tcalc/(TimeStep-TimeStepIni))*(TimeMax-TimeStep);
+    size_t n=sizeof(TimeSegL10)/sizeof(TimeSegL10[0]);
+    for (size_t i=n;i-->1;){ TimeSegL10[i]=TimeSegL10[i-1]; }
+    TimeSegL10[0]=tseg;
+    double tsegav=0;
+    size_t nparts=min(n,Part);
+    for (size_t i=0;i<nparts;i++){ tsegav+=TimeSegL10[i]; } tsegav/=nparts;
+    double tleft=tsegav*(TimeMax-TimeStep);
     Log->Printf("Part%s  %12.6f  %12d  %7d  %9.2f  %14s",suffixpartx.c_str(),TimeStep,(Nstep+1),Nstep-PartNstep,tseg,fun::GetDateTimeAfter(int(tleft)).c_str());
   }
   else Log->Printf("Part%s        %u particles successfully stored",suffixpartx.c_str(),npok);   

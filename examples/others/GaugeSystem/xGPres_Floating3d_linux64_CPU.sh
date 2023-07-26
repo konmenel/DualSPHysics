@@ -61,13 +61,9 @@ fi
 
 if [ $option -eq 2 -o $option -eq 1 ]; then
 export dirout2=${dirout}/particles
-${partvtk} -dirin ${diroutdata} -savevtk ${dirout2}/PartFluid -onlytype:-all,+fluid 
-if [ $? -ne 0 ] ; then fail; fi
-
-${partvtk} -dirin ${diroutdata} -savevtk ${dirout2}/PartFloating -onlytype:-all,+floating
-if [ $? -ne 0 ] ; then fail; fi
-
-${partvtk} -dirin ${diroutdata} -savevtk ${dirout2}/PartPiston -onlytype:-all,+moving
+${partvtk} -dirin ${diroutdata} -savevtk ${dirout2}/PartFluid -onlytype:-all,+fluid \
+	-savevtk ${dirout2}/PartFloating -onlytype:-all,+floating \
+	-savevtk ${dirout2}/PartPiston -onlytype:-all,+moving
 if [ $? -ne 0 ] ; then fail; fi
 
 ${partvtkout} -dirin ${diroutdata} -savevtk ${dirout2}/PartFluidOut -SaveResume ${dirout2}/_ResumeFluidOut

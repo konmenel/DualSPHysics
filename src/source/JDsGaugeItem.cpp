@@ -172,7 +172,7 @@ void JGaugeItem::GetConfig(std::vector<std::string> &lines)const{
     lines.push_back(fun::PrintStr("MkBound.....: %u (%s particles)",gau->GetMkBound(),TpPartGetStrCode(gau->GetTypeParts())));
     lines.push_back(fun::PrintStr("Particles id: %u - %u",gau->GetIdBegin(),gau->GetIdBegin()+gau->GetCount()-1));
   }
-  if(Type==GAUGE_Pres){
+  else if(Type==GAUGE_Pres){
     const JGaugePressure* gau=(JGaugePressure*)this;
     lines.push_back(fun::PrintStr("Point......: (%g,%g,%g)",gau->GetPoint().x,gau->GetPoint().y,gau->GetPoint().z));
     if(gau->GetActiveLink())

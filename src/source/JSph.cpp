@@ -2745,7 +2745,7 @@ void JSph::SaveData(unsigned npok,const JDataArrays& arrays
     for (size_t i=n;i-->1;){ TimeSegL10[i]=TimeSegL10[i-1]; }
     TimeSegL10[0]=tseg;
     double tsegav=0;
-    size_t nparts=min(n,Part);
+    size_t nparts=(n < Part) ? n : Part;
     for (size_t i=0;i<nparts;i++){ tsegav+=TimeSegL10[i]; } tsegav/=nparts;
     double tleft=tsegav*(TimeMax-TimeStep);
     Log->Printf("Part%s  %12.6f  %12d  %7d  %9.2f  %14s",suffixpartx.c_str(),TimeStep,(Nstep+1),Nstep-PartNstep,tseg,fun::GetDateTimeAfter(int(tleft)).c_str());

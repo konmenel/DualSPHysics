@@ -265,7 +265,7 @@ void JGaugeSystem::ReadXml(const JXml *sxml,TiXmlElement* lis,const JSphMk* mkin
           const word mkbound=(word)sxml->ReadElementUnsigned(ele,"target","mkbound");
           gau=AddGaugeForce(name,cfg.computestart,cfg.computeend,cfg.computedt,mkinfo,mkbound);
         }
-        if(cmd=="pressure"){
+        else if(cmd=="pressure"){
           const tdouble3 point=sxml->ReadElementDouble3(ele,"point");
           const word mkbound=(word)sxml->ReadElementUnsigned(ele,"link","mkbound",true,USHRT_MAX);
           gau=AddGaugePressure(name,cfg.computestart,cfg.computeend,cfg.computedt,mkinfo,mkbound,point);

@@ -168,11 +168,11 @@ public:
   bool Update(double timestep)const{ return(timestep>=ComputeNext && ComputeStart<=timestep && timestep<=ComputeEnd); }
   bool Output(double timestep)const{ return(OutputSave && timestep>=OutputNext && OutputStart<=timestep && timestep<=OutputEnd); }
 
-  virtual void ConfigureLinks(unsigned ftcount,const StFloatingData* ftobjs,const JDsMotion* dsmotion){};
+  virtual void ConfigureLinks(unsigned ftcount,StFloatingData *&ftobjs,const JDsMotion *dsmotion){};
   virtual void UpdateLinkPoint(){};
   #ifdef _WITHGPU
-  virtual void ConfigureLinksGpu(unsigned ftcount,const StFloatingData* ftobjs,const double3* ftcenterg
-    ,const float3* ftanglesg,const JDsMotion* dsmotion){};
+  virtual void ConfigureLinksGpu(unsigned ftcount,StFloatingData *&ftobjs,double3 *&ftcenterg
+    ,float3 *&ftanglesg,const JDsMotion *dsmotion){};
   virtual void UpdateLinkPointGpu(){};
   #endif
 
@@ -508,11 +508,15 @@ protected:
   word MkBound;                 //<The mk value of the boundary
   TpParticles TypeParts;        //<Type of the link particles (Floating or Moving)
   tdouble3 RelDist;             //<Relative distance to floating (if link is to a floating)
-  const StFloatingData *FtObj;  //<The floating data structure (NULL if link is to moving boundary)
-  const StMotionData *MotObj;   //<The motions data structure (NULL if link is to floating body)
+  
+  // NOTE: Double pointer because this class does not own the pointers so if the arrays ever resize the 
+  // pointers will be correct
+  size_t BodyOffset;            //<The offset of the floating or moving body in the arrays below.
+  StFloatingData **FtObjs;      //<The floating data array (NULL if link is to moving boundary)
+  const JDsMotion *MotObjs;     //<The motion's data array (NULL if link is to floating body)
   #ifdef _WITHGPU
-  const double3 *FtCenterg;
-  const float3 *FtAnglesg;
+  double3 **FtCenterg;          //<The center of the floating in GPU (NULL if link is to moving boundary)
+  float3 **FtAnglesg;           //<The euler angles of the floating in GPU (NULL if link is to moving boundary)
   #endif
 
   StGaugePresRes Result; ///<Result of the last measure.
@@ -528,11 +532,11 @@ public:
     ,bool activelink,word mkbound,TpParticles typeparts,bool cpu);
   ~JGaugePressure();
 
-  void ConfigureLinks(unsigned ftcount,const StFloatingData* ftobjs,const JDsMotion* dsmotion)override;
+  void ConfigureLinks(unsigned ftcount,StFloatingData *&ftobjs,const JDsMotion *dsmotion)override;
   void UpdateLinkPoint()override;
   #ifdef _WITHGPU
-  void ConfigureLinksGpu(unsigned ftcount,const StFloatingData* ftobjs,const double3* ftcenterg
-    ,const float3* ftanglesg,const JDsMotion* dsmotion)override;
+  void ConfigureLinksGpu(unsigned ftcount,StFloatingData *&ftobjs,double3 *&ftcenterg
+    ,float3 *&ftanglesg,const JDsMotion *dsmotion)override;
   void UpdateLinkPointGpu()override;
   #endif
 

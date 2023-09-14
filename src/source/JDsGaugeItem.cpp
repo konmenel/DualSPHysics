@@ -1110,8 +1110,8 @@ JGaugePressure::JGaugePressure(unsigned idx,std::string name,tdouble3 point
   ActiveLink=activelink;
   MkBound=mkbound;
   TypeParts=typeparts;
-  FtObj=NULL;
-  MotObj=NULL;
+  FtObjs=NULL;
+  MotObjs=NULL;
   #ifdef _WITHGPU
   FtCenterg=NULL;
   FtAnglesg=NULL;
@@ -1143,8 +1143,8 @@ void JGaugePressure::Reset(){
   ActiveLink=false;
   MkBound=0;
   TypeParts=TpPartUnknown;
-  FtObj=NULL;
-  MotObj=NULL;
+  FtObjs=NULL;
+  MotObjs=NULL;
   #ifdef _WITHGPU
   FtCenterg=NULL;
   FtAnglesg=NULL;
@@ -1286,21 +1286,23 @@ void JGaugePressure::CalculeCpu(double timestep,const StDivDataCpu &dvd
 //==============================================================================
 /// Sets the points to the floating or moving body link.
 //==============================================================================
-void JGaugePressure::ConfigureLinks(unsigned ftcount,const StFloatingData* ftobjs,const JDsMotion* dsmotion){
+void JGaugePressure::ConfigureLinks(unsigned ftcount,StFloatingData *&ftobjs,const JDsMotion *dsmotion){
   if (ActiveLink){
     switch (TypeParts){
     case TpPartFixed:{
       ActiveLink=false;
-      FtObj=NULL;
-      MotObj=NULL;
+      FtObjs=NULL;
+      MotObjs=NULL;
       break;
     }
     case TpPartFloating:{
-      MotObj=NULL;
+      MotObjs=NULL;
+      FtObjs=&ftobjs;
       unsigned cf=0;
       for(;cf<ftcount;cf++){
         if (ftobjs[cf].mkbound==MkBound){
-          FtObj=&(ftobjs[cf]);
+          BodyOffset=cf;
+          // FtObj=&(ftobjs[cf]);
           RelDist = Point-ftobjs[cf].center;
           break;
         }
@@ -1309,13 +1311,15 @@ void JGaugePressure::ConfigureLinks(unsigned ftcount,const StFloatingData* ftobj
       break;
     }
     case TpPartMoving:{
-      FtObj=NULL;
+      FtObjs=NULL;
+      MotObjs=dsmotion;
       unsigned ref=0;
       const unsigned nref=dsmotion->GetNumObjects();
       for(;ref<nref;ref++){
         const StMotionData& m=dsmotion->GetMotionData(ref);
         if (m.mkbound==MkBound){
-          MotObj=&m;
+          BodyOffset=ref;
+          // MotObj=&m;
           break;
         }
       }
@@ -1333,8 +1337,9 @@ void JGaugePressure::ConfigureLinks(unsigned ftcount,const StFloatingData* ftobj
 void JGaugePressure::UpdateLinkPoint(){
   if(ActiveLink){
     if (TypeParts==TpPartFloating){
-      const tdouble3& center=FtObj->center;
-      tdouble3 angles=ToTDouble3(FtObj->angles);
+      const StFloatingData &ftobj=(*FtObjs)[BodyOffset];
+      tdouble3 center=ftobj.center;
+      tdouble3 angles=ToTDouble3(ftobj.angles);
       tmatrix3d rot = fmath::RotMatrix3x3(angles);
       tmatrix4d mat = TMatrix4d(
         rot.a11, rot.a12, rot.a13, center.x,
@@ -1346,14 +1351,15 @@ void JGaugePressure::UpdateLinkPoint(){
       Point=p2;
     }
     else if (TypeParts==TpPartMoving){
-      if(MotObj->type==MOTT_Linear){//-Linear movement.
-        tdouble3 mov=MotObj->linmov;
+      const StMotionData &motobj=MotObjs->GetMotionData(BodyOffset);
+      if(motobj.type==MOTT_Linear){//-Linear movement.
+        tdouble3 mov=motobj.linmov;
         tdouble3 p2=Point+mov;
         if(CSP.simulate2d)p2.y=0;
         Point=p2;
       }
-      else if(MotObj->type==MOTT_Matrix){//-Matrix movement (for rotations).
-        tdouble3 p2 = MatrixMulPoint(MotObj->matmov, Point);
+      else if(motobj.type==MOTT_Matrix){//-Matrix movement (for rotations).
+        tdouble3 p2 = MatrixMulPoint(motobj.matmov, Point);
         if(CSP.simulate2d)p2.y=0;
         Point=p2;
       }  
@@ -1388,24 +1394,30 @@ void JGaugePressure::CalculeGpu(double timestep,const StDivDataGpu &dvd
 //==============================================================================
 /// Sets the points to the floating or moving body link (on GPU).
 //==============================================================================
-void JGaugePressure::ConfigureLinksGpu(unsigned ftcount,const StFloatingData* ftobjs,const double3* ftcenterg
-    ,const float3* ftanglesg,const JDsMotion* dsmotion){
+void JGaugePressure::ConfigureLinksGpu(unsigned ftcount,StFloatingData *&ftobjs,double3 *&ftcenterg
+    ,float3 *&ftanglesg,const JDsMotion *dsmotion){
   if (ActiveLink){
     switch (TypeParts){
     case TpPartFixed:{
       ActiveLink=false;
-      FtObj=NULL;
-      MotObj=NULL;
+      FtObjs=NULL;
+      MotObjs=NULL;
+      FtCenterg=NULL;
+      FtAnglesg=NULL;
       break;
     }
     case TpPartFloating:{
-      MotObj=NULL;
+      MotObjs=NULL;
+      FtObjs=&ftobjs;
+      FtCenterg=&ftcenterg;
+      FtAnglesg=&ftanglesg;
       unsigned cf=0;
       for(;cf<ftcount;cf++){
         if (ftobjs[cf].mkbound==MkBound){
-          FtObj=&(ftobjs[cf]);
-          FtCenterg=&(ftcenterg[cf]);
-          FtAnglesg=&(ftanglesg[cf]);
+          BodyOffset=cf;
+          // FtObj=&(ftobjs[cf]);
+          // FtCenterg=&(ftcenterg[cf]);
+          // FtAnglesg=&(ftanglesg[cf]);
           RelDist = Point-ftobjs[cf].center;
           break;
         }
@@ -1414,15 +1426,17 @@ void JGaugePressure::ConfigureLinksGpu(unsigned ftcount,const StFloatingData* ft
       break;
     }
     case TpPartMoving:{
-      FtObj=NULL;
+      FtObjs=NULL;
       FtCenterg=NULL;
       FtAnglesg=NULL;
+      MotObjs=dsmotion;
       unsigned ref=0;
       const unsigned nref=dsmotion->GetNumObjects();
       for(;ref<nref;ref++){
         const StMotionData& m=dsmotion->GetMotionData(ref);
         if (m.mkbound==MkBound){
-          MotObj=&m;
+          BodyOffset=ref;
+          // MotObj=&m;
           break;
         }
       }
@@ -1440,10 +1454,12 @@ void JGaugePressure::ConfigureLinksGpu(unsigned ftcount,const StFloatingData* ft
 void JGaugePressure::UpdateLinkPointGpu(){
   if(ActiveLink){
     if (TypeParts==TpPartFloating){
+      const double3 &ftcenterg=(*FtCenterg)[BodyOffset];
+      const float3 &ftanglesg=(*FtAnglesg)[BodyOffset];
       tdouble3 center=TDouble3(0);
       tfloat3 angles=TFloat3(0);
-      cudaMemcpy(&center,FtCenterg,sizeof(double3),cudaMemcpyDeviceToHost);
-      cudaMemcpy(&angles,FtAnglesg,sizeof(float3),cudaMemcpyDeviceToHost);
+      cudaMemcpy(&center,&ftcenterg,sizeof(double3),cudaMemcpyDeviceToHost);
+      cudaMemcpy(&angles,&ftanglesg,sizeof(float3),cudaMemcpyDeviceToHost);
       tmatrix3d rot = fmath::RotMatrix3x3(ToTDouble3(angles));
       tmatrix4d mat = TMatrix4d(
         rot.a11, rot.a12, rot.a13, center.x,
@@ -1455,14 +1471,15 @@ void JGaugePressure::UpdateLinkPointGpu(){
       Point=p2;
     }
     else if (TypeParts==TpPartMoving){
-      if(MotObj->type==MOTT_Linear){//-Linear movement.
-        tdouble3 mov=MotObj->linmov;
+      const StMotionData &motobj=MotObjs->GetMotionData(BodyOffset);
+      if(motobj.type==MOTT_Linear){//-Linear movement.
+        tdouble3 mov=motobj.linmov;
         tdouble3 p2=Point+mov;
         if(CSP.simulate2d)p2.y=0;
         Point=p2;
       }
-      else if(MotObj->type==MOTT_Matrix){//-Matrix movement (for rotations).
-        tdouble3 p2 = MatrixMulPoint(MotObj->matmov, Point);
+      else if(motobj.type==MOTT_Matrix){//-Matrix movement (for rotations).
+        tdouble3 p2 = MatrixMulPoint(motobj.matmov, Point);
         if(CSP.simulate2d)p2.y=0;
         Point=p2;
       }  

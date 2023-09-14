@@ -183,10 +183,10 @@ public:
   JGaugePressure* AddGaugePressure(std::string name,double computestart,double computeend,double computedt
     ,const JSphMk* mkinfo,word mkbound,const tdouble3 &point);
 
-  void ConfigureLinks(unsigned ftcount,const StFloatingData* ftobjs,const JDsMotion* dsmotion);
+  void ConfigureLinks(unsigned ftcount,StFloatingData *&ftobjs,const JDsMotion* dsmotion);
   #ifdef _WITHGPU
-  void ConfigureLinksGpu(unsigned ftcount,const StFloatingData* ftobjs,const double3* ftcenterg
-    ,const float3* ftanglesg,const JDsMotion* dsmotion);
+  void ConfigureLinksGpu(unsigned ftcount,StFloatingData *&ftobjs,double3 *&ftcenterg
+    ,float3 *&ftanglesg,const JDsMotion* dsmotion);
   #endif
 
   void SaveVtkInitPoints()const;

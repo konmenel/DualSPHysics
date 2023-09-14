@@ -572,7 +572,7 @@ void JGaugeSystem::SaveResults(unsigned cpart){
 //==============================================================================
 /// Configures the links for the gauges if link is active.
 //==============================================================================
-void JGaugeSystem::ConfigureLinks(unsigned ftcount,const StFloatingData* ftobjs,const JDsMotion* dsmotion){
+void JGaugeSystem::ConfigureLinks(unsigned ftcount,StFloatingData *&ftobjs,const JDsMotion *dsmotion){
   const unsigned ng=GetCount();
   for(unsigned cg=0;cg<ng;cg++){
     JGaugeItem* gau=Gauges[cg];
@@ -584,8 +584,8 @@ void JGaugeSystem::ConfigureLinks(unsigned ftcount,const StFloatingData* ftobjs,
 //==============================================================================
 /// Configures the links for the gauges if link is active (on GPU).
 //==============================================================================
-void JGaugeSystem::ConfigureLinksGpu(unsigned ftcount,const StFloatingData* ftobjs,const double3* ftcenterg
-  ,const float3* ftanglesg,const JDsMotion* dsmotion){
+void JGaugeSystem::ConfigureLinksGpu(unsigned ftcount,StFloatingData *&ftobjs,double3 *&ftcenterg
+  ,float3 *&ftanglesg,const JDsMotion* dsmotion){
   const unsigned ng=GetCount();
   for(unsigned cg=0;cg<ng;cg++){
     JGaugeItem* gau=Gauges[cg];

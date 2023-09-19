@@ -1188,13 +1188,13 @@ void JGaugePressure::SaveResults(){
     //-Saves head.
     if(first){
       scsv.SetHead();
-      scsv << "time [s];press [Pa];posx [m];posy [m];posz [m]" << jcsv::Endl();
+      scsv << "time [s];press [Pa];posx [m];posy [m];posz [m];kersum [-]" << jcsv::Endl();
     }
     //-Saves data.
     scsv.SetData();
-    scsv << jcsv::Fmt(jcsv::TpFloat1,"%g") << jcsv::Fmt(jcsv::TpFloat3,"%g;%g;%g");
+    scsv << jcsv::Fmt(jcsv::TpFloat1,"%g") << jcsv::Fmt(jcsv::TpFloat3,"%g;%g;%g") << jcsv::Fmt(jcsv::TpFloat1,"%g");
     for(unsigned c=0;c<OutCount;c++){
-      scsv << OutBuff[c].timestep << OutBuff[c].pres << OutBuff[c].point << jcsv::Endl();
+      scsv << OutBuff[c].timestep << OutBuff[c].pres << OutBuff[c].point << OutBuff[c].sumker << jcsv::Endl();
     }
     OutCount=0;
   }
@@ -1232,6 +1232,7 @@ template<TpKernel tker> void JGaugePressure::CalculeCpuT(double timestep
   SetTimeStep(timestep);
   //-Start measure.
   float ptpres=0.0f;
+  float sumker=0.0f;
   const bool ptout=PointIsOut(Point.x,Point.y,Point.z);//-Verify that the point is within domain boundaries. | Comprueba que el punto este dentro de limites del dominio.
 
   if(!ptout){
@@ -1256,15 +1257,14 @@ template<TpKernel tker> void JGaugePressure::CalculeCpuT(double timestep
       }
     }
     //-Applies kernel correction.
-    if(sumwab!=0){
-     sumpres/=sumwab;
-    //  PtVel=ToTFloat3(sumvel);
-    }
+    // if(sumwab!=0) sumpres/=sumwab;
+
     //-Stores result. | Guarda resultado.
     ptpres=sumpres;
+    sumker=float(sumwab);
   }
   //-Stores result. | Guarda resultado.
-  Result.Set(timestep,ToTFloat3(Point),ptpres);
+  Result.Set(timestep,ToTFloat3(Point),ptpres,sumker);
   //Log->Printf("------> t:%f",TimeStep);
   if(Output(timestep))StoreResult();
 }
@@ -1385,7 +1385,7 @@ void JGaugePressure::CalculeGpu(double timestep,const StDivDataGpu &dvd
     Check_CudaErroor("Failed in velocity calculation.");
   }
   //-Stores result. | Guarda resultado.
-  Result.Set(timestep,ToTFloat3(Point),ptpres.x);
+  Result.Set(timestep,ToTFloat3(Point),ptpres.x,ptpres.y);
   //Log->Printf("------> t:%f",TimeStep);
   if(Output(timestep))StoreResult();
 }

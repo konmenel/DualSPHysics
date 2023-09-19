@@ -490,14 +490,15 @@ public:
     double timestep;
     tfloat3 point;
     float pres;
+    float sumker;
     bool modified;
     StGaugePresRes(){ Reset(); }
     void Reset(){
-      Set(0,TFloat3(0),0.0f);
+      Set(0,TFloat3(0),0.0f, 0.0f);
       modified=false;
     }
-    void Set(double t,const tfloat3 &pt,const float pr){
-      timestep=t; point=pt; pres=pr; modified=true;
+    void Set(double t,const tfloat3 &pt,const float pr, float sumwab){
+      timestep=t; point=pt; pres=pr; sumker=sumwab; modified=true;
     }
   }StGaugePresRes;
 

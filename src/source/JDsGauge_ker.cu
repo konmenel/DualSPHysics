@@ -442,11 +442,10 @@ template<TpKernel tker> __global__ void KerInteractionGaugePres(float aker,doubl
       }
     }
     //-Applies kernel correction.
-    if(sumwab){
-     sumpres/=sumwab;
-    }
+    // if(sumwab) sumpres/=sumwab;
+    
     //-Stores result. | Guarda resultado.
-    ptpres[0]=make_float3(sumpres,0,0);
+    ptpres[0]=make_float3(sumpres,float(sumwab),0);
   }
 }
 //==============================================================================

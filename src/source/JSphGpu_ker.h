@@ -96,6 +96,8 @@ typedef struct StrInterParmsg{
   bool lamsps;
   TpDensity tdensity;
   TpShifting shiftmode;
+  TpKgc tkgc;
+  float kgcthreshold;
   //-Execution values.
   float viscob,viscof;
   unsigned bsbound,bsfluid;
@@ -125,6 +127,7 @@ typedef struct StrInterParmsg{
   float *delta;
   tsymatrix3f *gradvel;
   float4 *shiftposfs;
+  tsymatrix3f *kgcmat;
   //-Other values and objects.
   cudaStream_t stm;
   StKerInfo *kerinfo;
@@ -135,6 +138,7 @@ typedef struct StrInterParmsg{
     ,bool symmetry_ //<vs_syymmetry>
     ,TpKernel tkernel_,TpFtMode ftmode_
     ,bool lamsps_,TpDensity tdensity_,TpShifting shiftmode_
+    ,TpKgc tkgc_,float kgcthreshold_
     ,float viscob_,float viscof_
     ,unsigned bsbound_,unsigned bsfluid_
     ,unsigned np_,unsigned npb_,unsigned npbok_
@@ -147,6 +151,7 @@ typedef struct StrInterParmsg{
     ,float *viscdt_,float* ar_,float3 *ace_,float *delta_
     ,tsymatrix3f *spsgradvel_
     ,float4 *shiftposfs_
+    ,tsymatrix3f *kgcmat_
     ,cudaStream_t stm_
     ,StKerInfo *kerinfo_)
   {
@@ -155,6 +160,7 @@ typedef struct StrInterParmsg{
     symmetry=symmetry_; //<vs_syymmetry>
     tkernel=tkernel_; ftmode=ftmode_;
     lamsps=lamsps_; tdensity=tdensity_; shiftmode=shiftmode_;
+    tkgc=tkgc_; kgcthreshold=kgcthreshold_;
     //-Execution values.
     viscob=viscob_; viscof=viscof_;
     bsbound=bsbound_; bsfluid=bsfluid_;
@@ -173,6 +179,7 @@ typedef struct StrInterParmsg{
     viscdt=viscdt_; ar=ar_; ace=ace_; delta=delta_;
     gradvel=spsgradvel_;
     shiftposfs=shiftposfs_;
+    kgcmat=kgcmat_;
     //-Other values and objects.
     stm=stm_;
     kerinfo=kerinfo_;

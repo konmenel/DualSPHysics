@@ -67,6 +67,22 @@ __device__ double DistPlane(const float4 &pla,const double3 &pt){
 /// Initializes matrix to zero.
 /// Inicializa matriz a cero.
 //------------------------------------------------------------------------------
+__device__ void Tmatrix2fReset(tmatrix2f &m){
+  m.a11=m.a12=m.a21=m.a22=0;
+}
+
+//------------------------------------------------------------------------------
+/// Initializes matrix to zero.
+/// Inicializa matriz a cero.
+//------------------------------------------------------------------------------
+__device__ void Tmatrix2dReset(tmatrix2d &m){
+  m.a11=m.a12=m.a21=m.a22=0;
+}
+
+//------------------------------------------------------------------------------
+/// Initializes matrix to zero.
+/// Inicializa matriz a cero.
+//------------------------------------------------------------------------------
 __device__ void Tmatrix3fReset(tmatrix3f &m){ 
   m.a11=m.a12=m.a13=m.a21=m.a22=m.a23=m.a31=m.a32=m.a33=0; 
 }
@@ -77,6 +93,20 @@ __device__ void Tmatrix3fReset(tmatrix3f &m){
 //------------------------------------------------------------------------------
 __device__ void Tmatrix3dReset(tmatrix3d &m){ 
   m.a11=m.a12=m.a13=m.a21=m.a22=m.a23=m.a31=m.a32=m.a33=0; 
+}
+
+//------------------------------------------------------------------------------
+/// Initializes symmetric matrix to zero.
+//------------------------------------------------------------------------------
+__device__ void Tsymatrix3fReset(tsymatrix3f &m){ 
+  m.xx=m.xy=m.xz=m.yy=m.yz=m.zz=0;
+}
+
+//------------------------------------------------------------------------------
+/// Initializes symmetric matrix to zero.
+//------------------------------------------------------------------------------
+__device__ void Tsymatrix3dReset(tsymatrix3d &m){ 
+  m.xx=m.xy=m.xz=m.yy=m.yz=m.zz=0;
 }
 
 //------------------------------------------------------------------------------
@@ -93,6 +123,22 @@ __device__ void Tmatrix4fReset(tmatrix4f &m){
 //------------------------------------------------------------------------------
 __device__ void Tmatrix4dReset(tmatrix4d &m){ 
   m.a11=m.a12=m.a13=m.a14=m.a21=m.a22=m.a23=m.a24=m.a31=m.a32=m.a33=m.a34=m.a41=m.a42=m.a43=m.a44=0; 
+}
+
+//==============================================================================
+/// Calcula el determinante de una matriz de 2x2.
+/// Returns the determinant of a 2x2 matrix.
+//==============================================================================
+__device__ float Determinant2x2(const tmatrix2f &d){
+  return(d.a11 * d.a22 - d.a12 * d.a21);
+}
+
+//==============================================================================
+/// Calcula el determinante de una matriz de 2x2.
+/// Returns the determinant of a 2x2 matrix.
+//==============================================================================
+__device__ double Determinant2x2(const tmatrix2d &d){
+  return(d.a11 * d.a22 - d.a12 * d.a21);
 }
 
 //------------------------------------------------------------------------------
@@ -117,6 +163,74 @@ __device__ double Determinant3x3dbl(const tmatrix3f &d){
 //------------------------------------------------------------------------------
 __device__ double Determinant3x3(const tmatrix3d &d){
   return(d.a11*d.a22*d.a33 + d.a12*d.a23*d.a31 + d.a13*d.a21*d.a32 - d.a31*d.a22*d.a13 - d.a32*d.a23*d.a11 - d.a33*d.a21*d.a12);
+}
+
+//==============================================================================
+/// Calcula el determinante de una matriz simetrica de 3x3.
+/// Returns the determinant of a 3x3 symmetric matrix.
+//==============================================================================
+__device__ float Determinant3x3(const tsymatrix3f &d){
+  return(d.xx * (d.yy*d.zz - d.yz*d.yz)+
+         d.xy * (d.yz*d.xz - d.xy*d.zz)+
+         d.xz * (d.xy*d.yz - d.yy*d.xz));
+}
+
+//==============================================================================
+/// Calcula el determinante de una matriz simetrica de 3x3.
+/// Returns the determinant of a 3x3 symmetric matrix.
+//==============================================================================
+__device__ double Determinant3x3(const tsymatrix3d &d){
+  return(d.xx * (d.yy*d.zz - d.yz*d.yz)+
+         d.xy * (d.yz*d.xz - d.xy*d.zz)+
+         d.xz * (d.xy*d.yz - d.yy*d.xz));
+}
+
+//==============================================================================
+/// Devuelve la matriz inversa de una matriz de 2x2.
+/// Returns the inverse matrix of a 2x2 matrix.
+//==============================================================================
+__device__ tmatrix2f InverseMatrix2x2(const tmatrix2f &d,const float det){
+  tmatrix2f inv;
+  if(det){
+    inv.a11= d.a22/det;
+    inv.a12=-d.a12/det;
+    inv.a21=-d.a21/det;
+    inv.a22= d.a11/det;
+  }
+  else Tmatrix2fReset(inv);
+  return(inv);
+}
+
+//==============================================================================
+/// Devuelve la matriz inversa de una matriz de 2x2.
+/// Returns the inverse matrix of a 2x2 matrix.
+//==============================================================================
+__device__ tmatrix2f InverseMatrix2x2(const tmatrix2f &d){
+  return(InverseMatrix2x2(d,Determinant2x2(d)));
+}
+
+//==============================================================================
+/// Devuelve la matriz inversa de una matriz de 2x2.
+/// Returns the inverse matrix of a 2x2 matrix.
+//==============================================================================
+__device__ tmatrix2d InverseMatrix2x2(const tmatrix2d &d,const float det){
+  tmatrix2d inv;
+  if(det){
+    inv.a11= d.a22/det;
+    inv.a12=-d.a12/det;
+    inv.a21=-d.a21/det;
+    inv.a22= d.a11/det;
+  }
+  else Tmatrix2dReset(inv);
+  return(inv);
+}
+
+//==============================================================================
+/// Devuelve la matriz inversa de una matriz de 2x2.
+/// Returns the inverse matrix of a 2x2 matrix.
+//==============================================================================
+__device__ tmatrix2d InverseMatrix2x2(const tmatrix2d &d){
+  return(InverseMatrix2x2(d,Determinant2x2(d)));
 }
 
 //------------------------------------------------------------------------------
@@ -195,6 +309,54 @@ __device__ tmatrix3f InverseMatrix3x3(const tmatrix3f &d){
 /// Returns the inverse matrix of a 3x3 matrix.
 //==============================================================================
 __device__ tmatrix3d InverseMatrix3x3(const tmatrix3d &d){
+  return(InverseMatrix3x3(d,Determinant3x3(d)));
+}
+
+//==============================================================================
+/// Returns the inverse matrix of a 3x3 symmetric matrix.
+//==============================================================================
+__device__ tsymatrix3f InverseMatrix3x3(const tsymatrix3f &d,const float det){
+  tsymatrix3f inv;
+  if(det){
+    inv.xx=(d.yy*d.zz-d.yz*d.yz)/det;
+    inv.xy=(d.xz*d.yz-d.xy*d.zz)/det;
+    inv.xz=(d.xy*d.yz-d.xz*d.yy)/det;
+    inv.yy=(d.xx*d.zz-d.xz*d.xz)/det;
+    inv.yz=(d.xy*d.xz-d.xx*d.yz)/det;
+    inv.zz=(d.xx*d.yy-d.xy*d.xy)/det;
+  }
+  else Tsymatrix3fReset(inv);
+  return(inv);
+}
+
+//==============================================================================
+/// Returns the inverse matrix of a 3x3 symmetric matrix.
+//==============================================================================
+__device__ tsymatrix3f InverseMatrix3x3(const tsymatrix3f &d){
+  return(InverseMatrix3x3(d,Determinant3x3(d)));
+}
+
+//==============================================================================
+/// Returns the inverse matrix of a 3x3 symmetric matrix.
+//==============================================================================
+__device__ tsymatrix3d InverseMatrix3x3(const tsymatrix3d &d,const double det){
+  tsymatrix3d inv;
+  if(det){
+    inv.xx=(d.yy*d.zz-d.yz*d.yz)/det;
+    inv.xy=(d.xz*d.yz-d.xy*d.zz)/det;
+    inv.xz=(d.xy*d.yz-d.xz*d.yy)/det;
+    inv.yy=(d.xx*d.zz-d.xz*d.xz)/det;
+    inv.yz=(d.xy*d.xz-d.xx*d.yz)/det;
+    inv.zz=(d.xx*d.yy-d.xy*d.xy)/det;
+  }
+  else Tsymatrix3dReset(inv);
+  return(inv);
+}
+
+//==============================================================================
+/// Returns the inverse matrix of a 3x3 symmetric matrix.
+//==============================================================================
+__device__ tsymatrix3d InverseMatrix3x3(const tsymatrix3d &d){
   return(InverseMatrix3x3(d,Determinant3x3(d)));
 }
 
@@ -439,6 +601,27 @@ __device__ tmatrix3d RotMatrix3x3(const double3 &ang){
   return(ret);
 }
 
+//==============================================================================
+/// Add two symmetric 3x3 matrices
+//==============================================================================
+__device__ tsymatrix3f AddMatrix3x3(const tsymatrix3f& a, const tsymatrix3f &b){
+  tsymatrix3f ret;
+  ret.xx=a.xx+b.xx; ret.xy=a.xy+b.xy; ret.xz=a.xz+b.xz;
+                    ret.yy=a.yy+b.yy; ret.yz=a.yz+b.yz;
+                                      ret.zz=a.zz+b.zz;
+  return(ret);
+}
+
+//==============================================================================
+/// Multiply scalar to symmetric 3x3 matrix
+//==============================================================================
+__device__ tsymatrix3f MulMatrix3x3(const tsymatrix3f& a, float s){
+  tsymatrix3f ret;
+  ret.xx=a.xx*s; ret.xy=a.xy*s; ret.xz=a.xz*s;
+                 ret.yy=a.yy*s; ret.yz=a.yz*s;
+                                ret.zz=a.zz*s;
+  return(ret);
+}
 
 
 }

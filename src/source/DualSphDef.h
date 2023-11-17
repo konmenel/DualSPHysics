@@ -369,7 +369,11 @@ typedef enum{
   SHIFT_None=0              ///<Shifting is not applied.
 }TpShifting; 
 
-
+///Types for Kernel Gradient Correction
+typedef enum{
+  KGC_None=0,       ///<No Kernel Gradient Correction is appled.
+  KGC_Momentum=1    ///<Kernel Gradient Correction is appled only on momentum equation.
+}TpKgc;
 
 ///Structure with main SPH constants and configurations.
 typedef struct{

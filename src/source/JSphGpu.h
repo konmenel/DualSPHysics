@@ -185,6 +185,9 @@ protected:
   tsymatrix3f *SpsTaug;       ///<SPS sub-particle stress tensor.
   tsymatrix3f *SpsGradvelg;   ///<Velocity gradients.
 
+  //-Variables for Kernal Correction
+  tsymatrix3f *KgcMatg;     ///<The correction matrix "A".
+
   JDsTimersGpu *Timersg;  ///<Manages timers for GPU execution.
 
   void InitVars();

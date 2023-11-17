@@ -176,6 +176,8 @@ void JSph::InitVars(){
   TDensity=DDT_None; DDTValue=0; DDTArray=false;
   DDTRamp=TDouble3(0); //<vs_ddramp>
   ShiftingMode=(Shifting? Shifting->GetShiftMode(): SHIFT_None);
+  TKgc=KGC_None;
+  KgcThreshold=0.6;
   Visco=0; ViscoBoundFactor=1;
   TBoundary=BC_DBC;
   SlipMode=SLIP_Vel0;
@@ -683,6 +685,16 @@ void JSph::LoadConfigParameters(const JXml *xml){
     }
     Shifting=new JSphShifting(Simulate2D,Dp,KernelH);
     Shifting->ConfigBasic(shiftmode,shiftcoef,shifttfs);
+  }
+
+  //-Kernel Gradient Correction
+  switch(eparms.GetValueInt("KernelGradCorrection",true,0)){
+    case 0:  TKgc=KGC_None;     break;
+    case 1:  TKgc=KGC_Momentum;  break;
+    default: Run_ExceptioonFile("KernelGradCorrection mode in <execution><parameters> is not valid.",FileXml);
+  }
+  if(TKgc!=KGC_None){
+    KgcThreshold=eparms.GetValueFloat("KGCthreshold",true,0.6);
   }
 
   WrnPartsOut=(eparms.GetValueInt("WrnPartsOut",true,1)!=0);
@@ -1543,6 +1555,12 @@ void JSph::VisuConfig(){
     ConfigInfo=ConfigInfo+sep+Shifting->GetConfigInfo();
   }
   else Log->Print(fun::VarStr("Shifting","None"));
+  //-Kernel Gradient Correction.
+  if(TKgc!=KGC_None){
+    Log->Print(fun::VarStr("KernelGradCorrection",GetKGCName(TKgc)));
+    Log->Print(fun::VarStr("   KGCthreshhold",KgcThreshold));
+  }
+  else Log->Print(fun::VarStr("KernelGradCorrection","None"));
   //-RigidAlgorithm.
   string rigidalgorithm=(!FtCount? "None": GetNameRigidMode(RigidMode));
   Log->Print(fun::VarStr("RigidAlgorithm",rigidalgorithm));
@@ -3115,6 +3133,20 @@ std::string JSph::GetDDTName(TpDensity tdensity)const{
   else if(tdensity==DDT_DDT2)tx="Fourtakas et al 2019 (inner)";
   else if(tdensity==DDT_DDT2Full)tx="Fourtakas et al 2019 (full)";
   else tx="???";
+  return(tx);
+}
+
+//==============================================================================
+/// Returns name of Density Diffusion Term in text format.
+/// Devuelve nombre del Density Diffusion Term en texto.
+//==============================================================================
+std::string JSph::GetKGCName(TpKgc tkgc){
+  string tx;
+  switch(tkgc){
+    case KGC_None:      tx="None"; break;
+    case KGC_Momentum:  tx="Momentum equation"; break;
+    default:            tx="???";
+  }
   return(tx);
 }
 

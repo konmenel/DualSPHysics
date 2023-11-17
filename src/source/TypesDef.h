@@ -431,6 +431,15 @@ typedef struct{
   float xx,xy,xz,yy,yz,zz;
 }tsymatrix3f;
 inline tsymatrix3f TSymMatrix3f(){ tsymatrix3f m={0,0,0,0,0,0}; return(m); }
+inline tsymatrix3f TSymMatrix3f(float xx,float xy,float xz,float yy,float yz,float zz){ 
+  tsymatrix3f m={xx,xy,xz,yy,yz,zz}; return(m); 
+}
+inline tsymatrix3f operator +(const tsymatrix3f& a,const tsymatrix3f& b){ 
+  return(TSymMatrix3f(a.xx+b.xx, a.xy+b.xy, a.xz+b.xz, a.yy+b.yy, a.yz+b.yz, a.zz+b.zz)); 
+}
+inline tsymatrix3f operator *(const tsymatrix3f& a,const float b){ 
+  return(TSymMatrix3f(a.xx*b,a.xy*b,a.xz*b,a.yy*b,a.yz*b,a.zz*b)); 
+}
 
 ///Symmetric matrix 3x3 of 6 values of type float.
 typedef struct{

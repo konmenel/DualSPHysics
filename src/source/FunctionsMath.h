@@ -83,6 +83,21 @@ inline double InterpolationBilinear(double x,double y,double px,double py,double
   return(InterpolationLinear(y,py,py+dy,vy0,vy1));
 }
 
+//==============================================================================
+/// Calcula el determinante de una matriz de 2x2.
+/// Returns the determinant of a 2x2 matrix.
+//==============================================================================
+inline float Determinant2x2(const tmatrix2f &d){
+  return(d.a11 * d.a22 - d.a12 * d.a21);
+}
+
+//==============================================================================
+/// Calcula el determinante de una matriz de 2x2.
+/// Returns the determinant of a 2x2 matrix.
+//==============================================================================
+inline double Determinant2x2(const tmatrix2d &d){
+  return(d.a11 * d.a22 - d.a12 * d.a21);
+}
 
 //==============================================================================
 /// Calcula el determinante de una matriz de 3x3.
@@ -111,6 +126,16 @@ inline float Determinant3x3(const tsymatrix3f &d){
 }
 
 //==============================================================================
+/// Calcula el determinante de una matriz simetrica de 3x3.
+/// Returns the determinant of a 3x3 symmetric matrix.
+//==============================================================================
+inline double Determinant3x3(const tsymatrix3d &d){
+  return(d.xx * (d.yy*d.zz - d.yz*d.yz)+
+         d.xy * (d.yz*d.xz - d.xy*d.zz)+
+         d.xz * (d.xy*d.yz - d.yy*d.xz));
+}
+
+//==============================================================================
 /// Calcula el determinante de una matriz simetrica de 4x4.
 /// Returns the determinant of a 4x4 symmetric matrix.
 //==============================================================================
@@ -119,6 +144,55 @@ inline float Determinant4x4(const tsymatrix4f &d){
          d.a12 * (d.a12*d.a34*d.a34 + d.a23*d.a13*d.a44 + d.a24*d.a33*d.a14 - d.a12*d.a33*d.a44 - d.a23*d.a34*d.a14 - d.a24*d.a13*d.a34)+
          d.a13 * (d.a12*d.a23*d.a44 + d.a22*d.a34*d.a14 + d.a24*d.a13*d.a24 - d.a12*d.a34*d.a24 - d.a22*d.a13*d.a44 - d.a24*d.a23*d.a14)+
          d.a14 * (d.a12*d.a33*d.a24 + d.a22*d.a13*d.a34 + d.a23*d.a23*d.a14 - d.a12*d.a23*d.a34 - d.a22*d.a33*d.a14 - d.a23*d.a13*d.a24));
+}
+
+
+//==============================================================================
+/// Devuelve la matriz inversa de una matriz de 2x2.
+/// Returns the inverse matrix of a 2x2 matrix.
+//==============================================================================
+inline tmatrix2f InverseMatrix2x2(const tmatrix2f &d,const float det){
+  tmatrix2f inv;
+  if(det){
+    inv.a11= d.a22/det;
+    inv.a12=-d.a12/det;
+    inv.a21=-d.a21/det;
+    inv.a22= d.a11/det;
+  }
+  else inv=TMatrix2f(0);
+  return(inv);
+}
+
+//==============================================================================
+/// Devuelve la matriz inversa de una matriz de 2x2.
+/// Returns the inverse matrix of a 2x2 matrix.
+//==============================================================================
+inline tmatrix2f InverseMatrix2x2(const tmatrix2f &d){
+  return(InverseMatrix2x2(d,Determinant2x2(d)));
+}
+
+//==============================================================================
+/// Devuelve la matriz inversa de una matriz de 2x2.
+/// Returns the inverse matrix of a 2x2 matrix.
+//==============================================================================
+inline tmatrix2d InverseMatrix2x2(const tmatrix2d &d,const float det){
+  tmatrix2d inv;
+  if(det){
+    inv.a11= d.a22/det;
+    inv.a12=-d.a12/det;
+    inv.a21=-d.a21/det;
+    inv.a22= d.a11/det;
+  }
+  else inv=TMatrix2d(0);
+  return(inv);
+}
+
+//==============================================================================
+/// Devuelve la matriz inversa de una matriz de 2x2.
+/// Returns the inverse matrix of a 2x2 matrix.
+//==============================================================================
+inline tmatrix2d InverseMatrix2x2(const tmatrix2d &d){
+  return(InverseMatrix2x2(d,Determinant2x2(d)));
 }
 
 //==============================================================================
@@ -176,6 +250,55 @@ inline tmatrix3d InverseMatrix3x3(const tmatrix3d &d,const double det){
 /// Returns the inverse matrix of a 3x3 matrix.
 //==============================================================================
 inline tmatrix3d InverseMatrix3x3(const tmatrix3d &d){
+  return(InverseMatrix3x3(d,Determinant3x3(d)));
+}
+
+
+//==============================================================================
+/// Returns the inverse matrix of a 3x3 symmetric matrix.
+//==============================================================================
+inline tsymatrix3f InverseMatrix3x3(const tsymatrix3f &d,const float det){
+  tsymatrix3f inv;
+  if(det){
+    inv.xx=(d.yy*d.zz-d.yz*d.yz)/det;
+    inv.xy=(d.xz*d.yz-d.xy*d.zz)/det;
+    inv.xz=(d.xy*d.yz-d.xz*d.yy)/det;
+    inv.yy=(d.xx*d.zz-d.xz*d.xz)/det;
+    inv.yz=(d.xy*d.xz-d.xx*d.yz)/det;
+    inv.zz=(d.xx*d.yy-d.xy*d.xy)/det;
+  }
+  else inv=TSymMatrix3f();
+  return(inv);
+}
+
+//==============================================================================
+/// Returns the inverse matrix of a 3x3 symmetric matrix.
+//==============================================================================
+inline tsymatrix3f InverseMatrix3x3(const tsymatrix3f &d){
+  return(InverseMatrix3x3(d,Determinant3x3(d)));
+}
+
+
+//==============================================================================
+/// Returns the inverse matrix of a 3x3 symmetric matrix.
+//==============================================================================
+inline tsymatrix3d InverseMatrix3x3(const tsymatrix3d &d,const double det){
+  tsymatrix3d inv;
+  if(det){
+    inv.xx=(d.yy*d.zz-d.yz*d.yz)/det;
+    inv.xy=(d.xz*d.yz-d.xy*d.zz)/det;
+    inv.xz=(d.xy*d.yz-d.xz*d.yy)/det;
+    inv.yy=(d.xx*d.zz-d.xz*d.xz)/det;
+    inv.yz=(d.xy*d.xz-d.xx*d.yz)/det;
+    inv.zz=(d.xx*d.yy-d.xy*d.xy)/det;
+  }
+  else inv=TSymMatrix3d();
+  return(inv);
+}
+//==============================================================================
+/// Returns the inverse matrix of a 3x3 symmetric matrix.
+//==============================================================================
+inline tsymatrix3d InverseMatrix3x3(const tsymatrix3d &d){
   return(InverseMatrix3x3(d,Determinant3x3(d)));
 }
 

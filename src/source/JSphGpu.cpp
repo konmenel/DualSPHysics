@@ -143,6 +143,7 @@ void JSphGpu::InitVars(){
   VelrhopM1g=NULL;                                 //-Verlet
   PosxyPreg=NULL; PoszPreg=NULL; VelrhopPreg=NULL; //-Symplectic
   SpsTaug=NULL; SpsGradvelg=NULL;                  //-Laminar+SPS. 
+  KgcMatg=NULL;                                    //-Kernel Correction
   ViscDtg=NULL; 
   Arg=NULL; Aceg=NULL; Deltag=NULL;
   ShiftPosfsg=NULL;                                //-Shifting.
@@ -331,6 +332,9 @@ void JSphGpu::AllocGpuMemoryParticles(unsigned np,float over){
   }
   if(TVisco==VISCO_LaminarSPS){     
     ArraysGpu->AddArrayCount(JArraysGpu::SIZE_24B,2); //-SpsTau,SpsGradvel
+  }
+  if(TKgc!=KGC_None){     
+    ArraysGpu->AddArrayCount(JArraysGpu::SIZE_24B,1); //-KgcMat
   }
   if(CaseNfloat){
     ArraysGpu->AddArrayCount(JArraysGpu::SIZE_4B,4);  //-FtMasspg
@@ -648,11 +652,13 @@ void JSphGpu::ConfigBlockSizes(bool usezone,bool useperi){
         ,Symmetry  //<vs_syymmetry>
         ,TKernel,FtMode
         ,lamsps,TDensity,ShiftingMode
+        ,TKgc,KgcThreshold
         ,0,0,0,0,100,0,0
         ,0,0,divdatag,NULL
         ,NULL,NULL,NULL,NULL,NULL,NULL
         ,NULL,NULL,NULL
         ,NULL,NULL,NULL,NULL
+        ,NULL
         ,NULL
         ,NULL
         ,NULL,&kerinfo);
@@ -817,6 +823,7 @@ void JSphGpu::PreInteractionVars_Forces(unsigned np,unsigned npb){
   if(Deltag)cudaMemset(Deltag,0,sizeof(float)*np);                       //Deltag[]=0
   cudaMemset(Aceg,0,sizeof(tfloat3)*np);                                 //Aceg[]=(0,0,0)
   if(SpsGradvelg)cudaMemset(SpsGradvelg+npb,0,sizeof(tsymatrix3f)*npf);  //SpsGradvelg[]=(0,0,0,0,0,0).
+  if(KgcMatg)cudaMemset(KgcMatg+npb,0,sizeof(tsymatrix3f)*npf);          //KgcMatc[]=(0,0,0,0,0,0).
 
   //-Select particles for shifting.
   if(ShiftPosfsg)Shifting->InitGpu(npf,npb,Posxyg,Poszg,ShiftPosfsg);
@@ -838,6 +845,7 @@ void JSphGpu::PreInteraction_Forces(){
   if(DDTArray)Deltag=ArraysGpu->ReserveFloat();
   if(Shifting)ShiftPosfsg=ArraysGpu->ReserveFloat4();
   if(TVisco==VISCO_LaminarSPS)SpsGradvelg=ArraysGpu->ReserveSymatrix3f();
+  if(TKgc!=KGC_None)KgcMatg=ArraysGpu->ReserveSymatrix3f();
 
   //-Initialise arrays.
   PreInteractionVars_Forces(Np,Npb);
@@ -866,6 +874,7 @@ void JSphGpu::PosInteraction_Forces(){
   ArraysGpu->Free(Deltag);       Deltag=NULL;
   ArraysGpu->Free(ShiftPosfsg);  ShiftPosfsg=NULL;
   ArraysGpu->Free(SpsGradvelg);  SpsGradvelg=NULL;
+  ArraysGpu->Free(KgcMatg);      KgcMatg=NULL;
 }
 
 //==============================================================================

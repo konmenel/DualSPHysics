@@ -448,6 +448,7 @@ void JSphGpuSingle::Interaction_Forces(TpInterStep interstep){
     ,Symmetry //<vs_syymmetry>
     ,TKernel,FtMode
     ,lamsps,TDensity,ShiftingMode
+    ,TKgc,KgcThreshold
     ,Visco*ViscoBoundFactor,Visco
     ,bsbound,bsfluid,Np,Npb,NpbOk
     ,0,Nstep,DivData,Dcellg
@@ -456,6 +457,7 @@ void JSphGpuSingle::Interaction_Forces(TpInterStep interstep){
     ,ViscDtg,Arg,Aceg,Deltag
     ,SpsGradvelg
     ,ShiftPosfsg
+    ,KgcMatg
     ,NULL,NULL);
   cusph::Interaction_Forces(parms);
 

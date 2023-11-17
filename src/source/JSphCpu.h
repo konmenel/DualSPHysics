@@ -46,6 +46,7 @@ typedef struct{
   tfloat4 *shiftposfs;
   tsymatrix3f *spstau;
   tsymatrix3f *spsgradvel;
+  tsymatrix3f *kgcmat;
 }stinterparmsc;
 
 ///Collects parameters for particle interaction on CPU.
@@ -57,6 +58,7 @@ inline stinterparmsc StInterparmsc(unsigned np,unsigned npb,unsigned npbok
   ,float* ar,tfloat3 *ace,float *delta
   ,TpShifting shiftmode,tfloat4 *shiftposfs
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
+  ,tsymatrix3f *kgcmat
 )
 {
   stinterparmsc d={np,npb,npbok,(np-npb)
@@ -67,6 +69,7 @@ inline stinterparmsc StInterparmsc(unsigned np,unsigned npb,unsigned npbok
     ,ar,ace,delta
     ,shiftmode,shiftposfs
     ,spstau,spsgradvel
+    ,kgcmat
   };
   return(d);
 }
@@ -159,6 +162,9 @@ protected:
   tsymatrix3f *SpsTauc;       ///<SPS sub-particle stress tensor.
   tsymatrix3f *SpsGradvelc;   ///<Velocity gradients.
 
+  //-Variables for Kernal Correction
+  tsymatrix3f *KgcMatc;     ///<The correction matrix "A".
+
   JDsTimersCpu *Timersc;  ///<Manages timers for CPU execution.
 
   void InitVars();
@@ -218,10 +224,11 @@ protected:
     ,const tdouble3 *pos,const tfloat4 *velrhop,const typecode *code,const unsigned *id
     ,float &viscdt,float *ar)const;
 
-  template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool shift> 
+  template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool shift,bool kgc,bool sim2d> 
     void InteractionForcesFluid(unsigned n,unsigned pini,bool boundp2,float visco
     ,StDivDataCpu divdata,const unsigned *dcell
     ,const tsymatrix3f* tau,tsymatrix3f* gradvel
+    ,const tsymatrix3f* kgcmat
     ,const tdouble3 *pos,const tfloat4 *velrhop,const typecode *code,const unsigned *idp
     ,const float *press,const tfloat3 *dengradcorr
     ,float &viscdt,float *ar,tfloat3 *ace,float *delta
@@ -232,8 +239,10 @@ protected:
     ,const tdouble3 *pos,const tfloat4 *velrhop,const typecode *code,const unsigned *idp
     ,float &viscdt,tfloat3 *ace)const;
 
-  template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool shift> 
+  template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool shift,bool kgc,bool sim2d> 
     void Interaction_ForcesCpuT(const stinterparmsc &t,StInterResultc &res)const;
+  template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool shift,bool kgc> void Interaction_Forces_ct7(const stinterparmsc &t,StInterResultc &res)const;
+  template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool shift> void Interaction_Forces_ct6(const stinterparmsc &t,StInterResultc &res)const;
   template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity> void Interaction_Forces_ct5(const stinterparmsc &t,StInterResultc &res)const;
   template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco> void Interaction_Forces_ct4(const stinterparmsc &t,StInterResultc &res)const;
   template<TpKernel tker,TpFtMode ftmode> void Interaction_Forces_ct3(const stinterparmsc &t,StInterResultc &res)const;
@@ -252,6 +261,9 @@ protected:
     ,const tfloat3 *boundnormal,const tfloat3 *motionvel,tfloat4 *velrhop);
 
   void ComputeSpsTau(unsigned n,unsigned pini,const tfloat4 *velrhop,const tsymatrix3f *gradvel,tsymatrix3f *tau)const;
+
+  template<TpKernel tker> void ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos ,const tfloat4 *velrhop
+    ,const StDivDataCpu& divdata, const unsigned *dcell, tsymatrix3f *kgcmat)const;
 
   void ComputeVerletVarsFluid(bool shift,const tfloat3 *indirvel,const tfloat4 *velrhop1,const tfloat4 *velrhop2,double dt,double dt2,tdouble3 *pos,unsigned *cell,typecode *code,tfloat4 *velrhopnew)const;
   void ComputeVelrhopBound(const tfloat4* velrhopold,double armul,tfloat4* velrhopnew)const;

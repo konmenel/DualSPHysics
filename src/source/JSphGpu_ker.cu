@@ -522,6 +522,26 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
   ,TpShifting shiftmode,float4 &shiftposfsp1
   ,const tsymatrix3f *kgcmat,float kgcthreshold)
 {
+  //-Kernel Gradient Correction
+  tsymatrix3f bmat={1,0,0,
+                      1,0,
+                        1};
+  bool apply_kgc = kgc && !ftp1 && (cumath::Determinant3x3(kgcmat[p1])>kgcthreshold);
+  if(apply_kgc){
+    // const tsymatrix3f amat=cumath::MulMatrix3x3(cumath::AddMatrix3x3(kgcmat[p1],kgcmat[p2]), 0.5f);
+    const tsymatrix3f& amat=kgcmat[p1];
+    if(!sim2d) bmat=cumath::InverseMatrix3x3(amat); 
+    else{
+      //-submatrix of 3D-matrix 
+      const tmatrix2f amat2d={amat.xx, amat.xz,
+                              amat.xz, amat.zz};
+      const tmatrix2f bmat2d=cumath::InverseMatrix2x2(amat2d);
+      bmat.xx=bmat2d.a11; bmat.xy=0; bmat.xz=bmat2d.a12;
+                          bmat.yy=0; bmat.yz=0;
+                                      bmat.zz=bmat2d.a22;
+    }
+  }
+
   for(int p2=pini;p2<pfin;p2++){
     const float4 pscellp2=poscell[p2];
     float drx=pscellp1.x-pscellp2.x + CTE.poscellsize*(PSCEL_GetfX(pscellp1.w)-PSCEL_GetfX(pscellp2.w));
@@ -532,7 +552,15 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
     if(rr2<=CTE.kernelsize2 && rr2>=ALMOSTZERO){
       //-Computes kernel.
       const float fac=cufsph::GetKernel_Fac<tker>(rr2);
-      float frx=fac*drx,fry=fac*dry,frz=fac*drz; //-Gradients.
+      const float frx=fac*drx,fry=fac*dry,frz=fac*drz; //-Gradients.
+      float frxbar=frx,frybar=fry,frzbar=frz; //-Corrected Gradients (if kgc is used)
+
+      if(apply_kgc){
+        //-Correct the gradient terms (frx_corr=B*frx)
+        frxbar=frx*bmat.xx+fry*bmat.xy+frz*bmat.xz;
+        frybar=frx*bmat.xy+fry*bmat.yy+frz*bmat.yz;
+        frzbar=frx*bmat.xz+fry*bmat.yz+frz*bmat.zz;
+      }
 
       //-Obtains mass of particle p2 if any floating bodies exist.
       //-Obtiene masa de particula p2 en caso de existir floatings.
@@ -555,34 +583,31 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
       float4 velrhop2=velrhop[p2];
       if(symm)velrhop2.y=-velrhop2.y; //<vs_syymmetry>
 
-      //-Kernel Gradient Correction
-      if(kgc && compute && !boundp2){
-        const tsymatrix3f amat=cumath::MulMatrix3x3(cumath::AddMatrix3x3(kgcmat[p1],kgcmat[p2]), 0.5f);
-        if(sim2d){
-          const tmatrix2f amat2d={.a11=amat.xx, .a12=amat.xz,
-                                  .a21=amat.xz, .a22=amat.zz}; //-submatrix of 3D-matrix 
-          const float det=cumath::Determinant2x2(amat2d);
-          if(det>kgcthreshold){
-            tmatrix2f bmat2d=cumath::InverseMatrix2x2(amat2d,det);
+      // //-Kernel Gradient Correction
+      // if(kgc){
+      //   // if (!boundp2 && CODE_IsFluid(code[p2]) && cumath::Determinant3x3(kgcmat[p1])>kgcthreshold){
+      //   if (cumath::Determinant3x3(kgcmat[p1])>kgcthreshold){
+      //     // const tsymatrix3f amat=cumath::MulMatrix3x3(cumath::AddMatrix3x3(kgcmat[p1],kgcmat[p2]), 0.5f);
+      //     const tsymatrix3f amat=kgcmat[p1];
+      //     if(sim2d){
+      //       //-submatrix of 3D-matrix 
+      //       const tmatrix2f amat2d={amat.xx, amat.xz,
+      //                               amat.xz, amat.zz};
+      //       const tmatrix2f bmat2d=cumath::InverseMatrix2x2(amat2d);
 
-            //-Correct the gradient terms (fac_corr=B*fac)
-            const float corrfrx=frx*bmat2d.a11+frz*bmat2d.a12;
-            const float corrfrz=frx*bmat2d.a21+frz*bmat2d.a22;
-            frx=corrfrx; frz=corrfrz;
-          }
-        }else{
-          const float det=cumath::Determinant3x3(amat);
-          if(det>kgcthreshold){
-            tsymatrix3f bmat=cumath::InverseMatrix3x3(amat,det);
+      //       //-Correct the gradient terms (frx_corr=B*frx)
+      //       frxbar=frx*bmat2d.a11+frz*bmat2d.a12;
+      //       frzbar=frx*bmat2d.a21+frz*bmat2d.a22;
+      //     }else{
+      //       const tsymatrix3f bmat=cumath::InverseMatrix3x3(amat);
             
-            //-Correct the gradient terms (fac_corr=B*fac)
-            const float corrfrx=frx*bmat.xx+fry*bmat.xy+frz*bmat.xz;
-            const float corrfry=frx*bmat.xy+fry*bmat.yy+frz*bmat.yz;
-            const float corrfrz=frx*bmat.xz+fry*bmat.yz+frz*bmat.zz;
-            frx=corrfrx; fry=corrfry; frz=corrfrz;
-          }
-        }
-      }
+      //       //-Correct the gradient terms (frx_corr=B*frx)
+      //       frxbar=frx*bmat.xx+fry*bmat.xy+frz*bmat.xz;
+      //       frybar=frx*bmat.xy+fry*bmat.yy+frz*bmat.yz;
+      //       frzbar=frx*bmat.xz+fry*bmat.yz+frz*bmat.zz;
+      //     }
+      //   }
+      // }
       
       //-Velocity derivative (Momentum equation).
       if(compute){
@@ -590,7 +615,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
         const float prs=(pressp1+pressp2)/(velrhop1.w*velrhop2.w)
           +(tker==KERNEL_Cubic? cufsph::GetKernelCubic_Tensil(rr2,velrhop1.w,pressp1,velrhop2.w,pressp2): 0);
         const float p_vpm=-prs*(USE_FLOATING? ftmassp2: massp2);
-        acep1.x+=p_vpm*frx; acep1.y+=p_vpm*fry; acep1.z+=p_vpm*frz;
+        acep1.x+=p_vpm*frxbar; acep1.y+=p_vpm*frybar; acep1.z+=p_vpm*frzbar;
       }
 
       //-Density derivative (Continuity equation).
@@ -636,7 +661,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
             const float amubar=CTE.kernelh*dot_rr2;  //amubar=CTE.kernelh*dot/(rr2+CTE.eta2);
             const float robar=(velrhop1.w+velrhop2.w)*0.5f;
             const float pi_visc=(-visco*cbar*amubar/robar)*(USE_FLOATING? ftmassp2: massp2);
-            acep1.x-=pi_visc*frx; acep1.y-=pi_visc*fry; acep1.z-=pi_visc*frz;
+            acep1.x-=pi_visc*frxbar; acep1.y-=pi_visc*frybar; acep1.z-=pi_visc*frzbar;
           }
         }
         else{//-Laminar+SPS viscosity.
@@ -655,15 +680,15 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
                    taup2=tauff[p2*3+1];   taup2_xz_yy.x+=taup2.x; taup2_xz_yy.y+=taup2.y;
                    taup2=tauff[p2*3+2];   taup2_yz_zz.x+=taup2.x; taup2_yz_zz.y+=taup2.y;
           }
-          acep1.x+=(USE_FLOATING? ftmassp2: massp2)*(taup2_xx_xy.x*frx+taup2_xx_xy.y*fry+taup2_xz_yy.x*frz);
-          acep1.y+=(USE_FLOATING? ftmassp2: massp2)*(taup2_xx_xy.y*frx+taup2_xz_yy.y*fry+taup2_yz_zz.x*frz);
-          acep1.z+=(USE_FLOATING? ftmassp2: massp2)*(taup2_xz_yy.x*frx+taup2_yz_zz.x*fry+taup2_yz_zz.y*frz);
+          acep1.x+=(USE_FLOATING? ftmassp2: massp2)*(taup2_xx_xy.x*frxbar+taup2_xx_xy.y*frybar+taup2_xz_yy.x*frzbar);
+          acep1.y+=(USE_FLOATING? ftmassp2: massp2)*(taup2_xx_xy.y*frxbar+taup2_xz_yy.y*frybar+taup2_yz_zz.x*frzbar);
+          acep1.z+=(USE_FLOATING? ftmassp2: massp2)*(taup2_xz_yy.x*frxbar+taup2_yz_zz.x*frybar+taup2_yz_zz.y*frzbar);
           //-Velocity gradients.
           if(USE_NOFLOATING || !ftp1){//-When p1 is fluid.
             const float volp2=-(USE_FLOATING? ftmassp2: massp2)/velrhop2.w;
-            float dv=dvx*volp2; grap1_xx_xy.x+=dv*frx; grap1_xx_xy.y+=dv*fry; grap1_xz_yy.x+=dv*frz;
-                  dv=dvy*volp2; grap1_xx_xy.y+=dv*frx; grap1_xz_yy.y+=dv*fry; grap1_yz_zz.x+=dv*frz;
-                  dv=dvz*volp2; grap1_xz_yy.x+=dv*frx; grap1_yz_zz.x+=dv*fry; grap1_yz_zz.y+=dv*frz;
+            float dv=dvx*volp2; grap1_xx_xy.x+=dv*frxbar; grap1_xx_xy.y+=dv*frybar; grap1_xz_yy.x+=dv*frzbar;
+                  dv=dvy*volp2; grap1_xx_xy.y+=dv*frxbar; grap1_xz_yy.y+=dv*frybar; grap1_yz_zz.x+=dv*frzbar;
+                  dv=dvz*volp2; grap1_xz_yy.x+=dv*frxbar; grap1_yz_zz.x+=dv*frybar; grap1_yz_zz.y+=dv*frzbar;
             // to compute tau terms we assume that gradvel.xy=gradvel.dudy+gradvel.dvdx, gradvel.xz=gradvel.dudz+gradvel.dwdx, gradvel.yz=gradvel.dvdz+gradvel.dwdy
             // so only 6 elements are needed instead of 3x3.
           }
@@ -778,7 +803,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
 template<TpKernel tker>
   __global__ void KerComputeKgcMat(unsigned n,unsigned pinit,int scelldiv,int4 nc
   ,int3 cellzero,const int2 *begincell,unsigned cellfluid,const unsigned *dcell
-  ,const float4 *poscell,const float4 *velrhop,tsymatrix3f *kgcmat)
+  ,const float4 *poscell,const float4 *velrhop,const typecode *code,tsymatrix3f *kgcmat)
 {
   const unsigned p=blockIdx.x*blockDim.x + threadIdx.x; //-Number of particle.
   if(p<n){
@@ -802,10 +827,9 @@ template<TpKernel tker>
           float dry=pscellp1.y-pscellp2.y + CTE.poscellsize*(PSCEL_GetfY(pscellp1.w)-PSCEL_GetfY(pscellp2.w));
           float drz=pscellp1.z-pscellp2.z + CTE.poscellsize*(PSCEL_GetfZ(pscellp1.w)-PSCEL_GetfZ(pscellp2.w));
           const float rr2=drx*drx+dry*dry+drz*drz;
-          if(rr2<=CTE.kernelsize2 && rr2>=ALMOSTZERO){
+          if(rr2<=CTE.kernelsize2 && rr2>=ALMOSTZERO && CODE_IsFluid(code[p2])){
             //-Computes kernel.
             const float fac=cufsph::GetKernel_Fac<tker>(rr2);
-            // const float frx=fac*drx,fry=fac*dry,frz=fac*drz; //-Gradients.
 
             //===== Get volume of particle p2 ===== 
             const float volp2=CTE.massf/velrhop[p2].w;   // Only fluid particles are summed.
@@ -879,20 +903,16 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
   if(t.fluidnum){
     //printf("[ns:%u  id:%d] halo:%d fini:%d(%d) bini:%d(%d)\n",t.nstep,t.id,t.halo,t.fluidini,t.fluidnum,t.boundini,t.boundnum);
     dim3 sgridf=GetSimpleGridSize(t.fluidnum,t.bsfluid);
+
+    if(kgc)KerComputeKgcMat<tker> <<<sgridf,t.bsfluid,0,t.stm>>>(t.fluidnum,t.fluidini,dvd.scelldiv,dvd.nc,dvd.cellzero
+      ,dvd.beginendcell,dvd.cellfluid,t.dcell,t.poscell,t.velrhop,t.code,t.kgcmat);
     
     if(t.symmetry){ //<vs_syymmetry_ini>
-      //-Kernel Correction
-      if(kgc)KerComputeKgcMat<tker> <<<sgridf,t.bsfluid,0,t.stm>>>(t.fluidnum,t.fluidini,dvd.scelldiv,dvd.nc,dvd.cellzero
-        ,dvd.beginendcell,dvd.cellfluid,t.dcell,t.poscell,t.velrhop,t.kgcmat);
-
       KerInteractionForcesFluid<tker,ftmode,lamsps,tdensity,shift,kgc,sim2d,true> <<<sgridf,t.bsfluid,0,t.stm>>> 
       (t.fluidnum,t.fluidini,t.viscob,t.viscof,dvd.scelldiv,dvd.nc,dvd.cellzero,dvd.beginendcell,dvd.cellfluid,t.dcell
       ,t.ftomassp,(const float2*)t.tau,(float2*)t.gradvel,t.dengradcorr,t.poscell,t.velrhop,t.code,t.idp
       ,t.viscdt,t.ar,t.ace,t.delta,t.shiftmode,t.shiftposfs,t.kgcmat,t.kgcthreshold);
     }else{ //<vs_syymmetry_end>
-      if(kgc)KerComputeKgcMat<tker> <<<sgridf,t.bsfluid,0,t.stm>>>(t.fluidnum,t.fluidini,dvd.scelldiv,dvd.nc,dvd.cellzero
-        ,dvd.beginendcell,dvd.cellfluid,t.dcell,t.poscell,t.velrhop,t.kgcmat);
-
       KerInteractionForcesFluid<tker,ftmode,lamsps,tdensity,shift,kgc,sim2d,false> <<<sgridf,t.bsfluid,0,t.stm>>> 
       (t.fluidnum,t.fluidini,t.viscob,t.viscof,dvd.scelldiv,dvd.nc,dvd.cellzero,dvd.beginendcell,dvd.cellfluid,t.dcell
       ,t.ftomassp,(const float2*)t.tau,(float2*)t.gradvel,t.dengradcorr,t.poscell,t.velrhop,t.code,t.idp

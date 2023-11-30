@@ -679,6 +679,25 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
     const tsymatrix3f taup1=(tvisco==VISCO_Artificial? gradvelp1: tau[p1]);
     const bool rsymp1=(Symmetry && posp1.y<=KernelSize); //<vs_syymmetry>
 
+    //-Kernel Gradient Correction
+    tsymatrix3f bmat={1,0,0,
+                        1,0,
+                          1};
+    bool apply_kgc = kgc && !ftp1 && (fmath::Determinant3x3(kgcmat[p1])>KgcThreshold);
+    if(apply_kgc){
+      const tsymatrix3f& amat=kgcmat[p1];
+      if(!sim2d) bmat=fmath::InverseMatrix3x3(amat); 
+      else {
+        //-submatrix of 3D-matrix 
+        const tmatrix2f amat2d=TMatrix2f(amat.xx,amat.xz,
+                                          amat.xz,amat.zz);
+        const tmatrix2f bmat2d=fmath::InverseMatrix2x2(amat2d);
+        bmat.xx=bmat2d.a11; bmat.xy=0; bmat.xz=bmat2d.a12;
+                            bmat.yy=0; bmat.yz=0;
+                                        bmat.zz=bmat2d.a22;
+      }
+    }
+
     //-Search for neighbours in adjacent cells.
     const StNgSearch ngs=nsearch::Init(dcell[p1],boundp2,divdata);
     for(int z=ngs.zini;z<ngs.zfin;z++)for(int y=ngs.yini;y<ngs.yfin;y++){
@@ -696,7 +715,8 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
         if(rr2<=KernelSize2 && rr2>=ALMOSTZERO){
           //-Computes kernel.
           const float fac=fsph::GetKernel_Fac<tker>(CSP,rr2);
-          float frx=fac*drx,fry=fac*dry,frz=fac*drz; //-Gradients.
+          const float frx=fac*drx,fry=fac*dry,frz=fac*drz; //-Gradients.
+          float frxbar=frx,frybar=fry,frzbar=frz; //-Corrected Gradients (if kgc is used)
 
           //===== Get mass of particle p2 ===== 
           float massp2=(boundp2? MassBound: MassFluid); //-Contiene masa de particula segun sea bound o fluid.
@@ -717,41 +737,18 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
           tfloat4 velrhop2=velrhop[p2];
           if(rsym)velrhop2.y=-velrhop2.y; //<vs_syymmetry>
 
-          //-Kernel Gradient Correction
-          if(kgc && compute && !boundp2){
-            const tsymatrix3f amat=(kgcmat[p1]+kgcmat[p2])*0.5f;
-            if(sim2d){
-              const tmatrix2f amat2d=TMatrix2f(amat.xx,amat.xz,
-                                               amat.xz,amat.zz); //-submatrix of 3D-matrix 
-              const float det=fmath::Determinant2x2(amat2d);
-              // if(det<KgcThreshold) Log->Printf("%f\n",det);
-              if(det>KgcThreshold){
-                tmatrix2f bmat2d=fmath::InverseMatrix2x2(amat2d,det);
-
-                //-Correct the gradient terms (fac_corr=B*fac)
-                const float corrfrx=frx*bmat2d.a11+frz*bmat2d.a12;
-                const float corrfrz=frx*bmat2d.a21+frz*bmat2d.a22;
-                frx=corrfrx; frz=corrfrz;
-              }
-            }else{
-              const float det=fmath::Determinant3x3(amat);
-              if(det>KgcThreshold){
-                tsymatrix3f bmat=fmath::InverseMatrix3x3(amat,det);
-                
-                //-Correct the gradient terms (fac_corr=B*fac)
-                const float corrfrx=frx*bmat.xx+fry*bmat.xy+frz*bmat.xz;
-                const float corrfry=frx*bmat.xy+fry*bmat.yy+frz*bmat.yz;
-                const float corrfrz=frx*bmat.xz+fry*bmat.yz+frz*bmat.zz;
-                frx=corrfrx; fry=corrfry; frz=corrfrz;
-              }
-            }
+          if(apply_kgc){
+            //-Correct the gradient terms (frx_corr=B*frx)
+            frxbar=frx*bmat.xx+fry*bmat.xy+frz*bmat.xz;
+            frybar=frx*bmat.xy+fry*bmat.yy+frz*bmat.yz;
+            frzbar=frx*bmat.xz+fry*bmat.yz+frz*bmat.zz;
           }
 
           //-Velocity derivative (Momentum equation).
           if(compute){
             const float prs=(pressp1+press[p2])/(rhopp1*velrhop2.w) + (tker==KERNEL_Cubic? fsph::GetKernelCubic_Tensil(CSP,rr2,rhopp1,pressp1,velrhop2.w,press[p2]): 0);
             const float p_vpm=-prs*massp2;
-            acep1.x+=p_vpm*frx; acep1.y+=p_vpm*fry; acep1.z+=p_vpm*frz;
+            acep1.x+=p_vpm*frxbar; acep1.y+=p_vpm*frybar; acep1.z+=p_vpm*frzbar;
           }
 
           //-Density derivative (Continuity equation).
@@ -798,14 +795,14 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
                 const float amubar=KernelH*dot_rr2;  //amubar=CTE.h*dot/(rr2+CTE.eta2);
                 const float robar=(rhopp1+velrhop2.w)*0.5f;
                 const float pi_visc=(-visco*cbar*amubar/robar)*massp2;
-                acep1.x-=pi_visc*frx; acep1.y-=pi_visc*fry; acep1.z-=pi_visc*frz;
+                acep1.x-=pi_visc*frxbar; acep1.y-=pi_visc*frybar; acep1.z-=pi_visc*frzbar;
               }
             }
             else if(tvisco==VISCO_LaminarSPS){//-Laminar+SPS viscosity. 
               {//-Laminar contribution.
                 const float robar2=(rhopp1+velrhop2.w);
                 const float temp=4.f*visco/((rr2+Eta2)*robar2);  //-Simplification of: temp=2.0f*visco/((rr2+CTE.eta2)*robar); robar=(rhopp1+velrhop2.w)*0.5f;
-                const float vtemp=massp2*temp*(drx*frx+dry*fry+drz*frz);  
+                const float vtemp=massp2*temp*(drx*frxbar+dry*frybar+drz*frzbar);  
                 acep1.x+=vtemp*dvx; acep1.y+=vtemp*dvy; acep1.z+=vtemp*dvz;
               }
               //-SPS turbulence model.
@@ -815,15 +812,15 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
                 tau_xx+=tau[p2].xx; tau_xy+=tau[p2].xy; tau_xz+=tau[p2].xz;
                 tau_yy+=tau[p2].yy; tau_yz+=tau[p2].yz; tau_zz+=tau[p2].zz;
               }
-              acep1.x+=massp2*(tau_xx*frx + tau_xy*fry + tau_xz*frz);
-              acep1.y+=massp2*(tau_xy*frx + tau_yy*fry + tau_yz*frz);
-              acep1.z+=massp2*(tau_xz*frx + tau_yz*fry + tau_zz*frz);
+              acep1.x+=massp2*(tau_xx*frxbar + tau_xy*frybar + tau_xz*frzbar);
+              acep1.y+=massp2*(tau_xy*frxbar + tau_yy*frybar + tau_yz*frzbar);
+              acep1.z+=massp2*(tau_xz*frxbar + tau_yz*frybar + tau_zz*frzbar);
               //-Velocity gradients.
               if(!ftp1){//-When p1 is a fluid particle. 
                 const float volp2=-massp2/velrhop2.w;
-                float dv=dvx*volp2; gradvelp1.xx+=dv*frx; gradvelp1.xy+=dv*fry; gradvelp1.xz+=dv*frz;
-                      dv=dvy*volp2; gradvelp1.xy+=dv*frx; gradvelp1.yy+=dv*fry; gradvelp1.yz+=dv*frz;
-                      dv=dvz*volp2; gradvelp1.xz+=dv*frx; gradvelp1.yz+=dv*fry; gradvelp1.zz+=dv*frz;
+                float dv=dvx*volp2; gradvelp1.xx+=dv*frxbar; gradvelp1.xy+=dv*frybar; gradvelp1.xz+=dv*frzbar;
+                      dv=dvy*volp2; gradvelp1.xy+=dv*frxbar; gradvelp1.yy+=dv*frybar; gradvelp1.yz+=dv*frzbar;
+                      dv=dvz*volp2; gradvelp1.xz+=dv*frxbar; gradvelp1.yz+=dv*frybar; gradvelp1.zz+=dv*frzbar;
                 //-To compute tau terms we assume that gradvel.xy=gradvel.dudy+gradvel.dvdx, gradvel.xz=gradvel.dudz+gradvel.dwdx, gradvel.yz=gradvel.dvdz+gradvel.dwdy
                 //-so only 6 elements are needed instead of 3x3.
               }
@@ -997,7 +994,7 @@ void JSphCpu::ComputeSpsTau(unsigned n,unsigned pini,const tfloat4 *velrhop,cons
 //==============================================================================
 template<TpKernel tker>
 void JSphCpu::ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos,const tfloat4 *velrhop
-  ,const StDivDataCpu& divdata,const unsigned *dcell,tsymatrix3f *kgcmat)const{
+  ,const typecode *code,const StDivDataCpu& divdata,const unsigned *dcell,tsymatrix3f *kgcmat)const{
   const int pfin=int(pini+n);
   #ifdef OMP_USE
     #pragma omp parallel for schedule (static)
@@ -1016,7 +1013,7 @@ void JSphCpu::ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos,const 
         const float dry=float(posp1.y-pos[p2].y);
         const float drz=float(posp1.z-pos[p2].z);
         const float rr2=drx*drx+dry*dry+drz*drz;
-        if(rr2<=KernelSize2 && rr2>=ALMOSTZERO){
+        if(rr2<=KernelSize2 && rr2>=ALMOSTZERO && CODE_IsFluid(code[p2])){
           //-Computes kernel.
           const float fac=fsph::GetKernel_Fac<tker>(CSP,rr2);
 
@@ -1043,7 +1040,7 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
 {
   float viscdt=res.viscdt;
   if(t.npf){
-    if(kgc)ComputeKgcMat<tker>(t.npf,t.npb,t.pos,t.velrhop,t.divdata,t.dcell,t.kgcmat);
+    if(kgc)ComputeKgcMat<tker>(t.npf,t.npb,t.pos,t.velrhop,t.code,t.divdata,t.dcell,t.kgcmat);
 
     //-Interaction Fluid-Fluid.
     InteractionForcesFluid<tker,ftmode,tvisco,tdensity,shift,kgc,sim2d> (t.npf,t.npb,false,Visco                 

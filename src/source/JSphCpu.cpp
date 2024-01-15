@@ -632,19 +632,21 @@ template<TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionForcesBound
   for(int th=0;th<OmpThreads;th++)if(viscdt<viscth[th*OMP_STRIDE])viscdt=viscth[th*OMP_STRIDE];
 }
 
+#define PrintTSymatrixf(mat) printf("%s:\n%.4f,%.4f,%.4f\n%.4f,%.4f,%.4f\n,%.4f,%.4f,%.4f\n", #mat,(mat).xx,(mat).xy,(mat).xz,(mat).xy,(mat).yy,(mat).yz,(mat).xz,(mat).yz,(mat).zz)
+
 //==============================================================================
 /// Perform interaction between particles: Fluid/Float-Fluid/Float or Fluid/Float-Bound
 /// Realiza interaccion entre particulas: Fluid/Float-Fluid/Float or Fluid/Float-Bound
 //==============================================================================
-template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool shift,bool kgc,bool sim2d> 
+template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool shift,bool kgc> 
   void JSphCpu::InteractionForcesFluid(unsigned n,unsigned pinit,bool boundp2,float visco
   ,StDivDataCpu divdata,const unsigned *dcell
   ,const tsymatrix3f* tau,tsymatrix3f* gradvel
-  ,const tsymatrix3f* kgcmat
   ,const tdouble3 *pos,const tfloat4 *velrhop,const typecode *code,const unsigned *idp
   ,const float *press,const tfloat3 *dengradcorr
   ,float &viscdt,float *ar,tfloat3 *ace,float *delta
-  ,TpShifting shiftmode,tfloat4 *shiftposfs)const
+  ,TpShifting shiftmode,tfloat4 *shiftposfs
+  ,TpKgc tkgc,const tsymatrix3f* kgcmat)const
 {
   //-Initialize viscth to calculate viscdt maximo con OpenMP. | Inicializa viscth para calcular visdt maximo con OpenMP.
   float viscth[OMP_MAXTHREADS*OMP_STRIDE];
@@ -679,24 +681,13 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
     const tsymatrix3f taup1=(tvisco==VISCO_Artificial? gradvelp1: tau[p1]);
     const bool rsymp1=(Symmetry && posp1.y<=KernelSize); //<vs_syymmetry>
 
-    //-Kernel Gradient Correction
-    tsymatrix3f bmat={1,0,0,
-                        1,0,
-                          1};
-    bool apply_kgc = kgc && !ftp1 && (fmath::Determinant3x3(kgcmat[p1])>KgcThreshold);
-    if(apply_kgc){
-      const tsymatrix3f& amat=kgcmat[p1];
-      if(!sim2d) bmat=fmath::InverseMatrix3x3(amat); 
-      else {
-        //-submatrix of 3D-matrix 
-        const tmatrix2f amat2d=TMatrix2f(amat.xx,amat.xz,
-                                          amat.xz,amat.zz);
-        const tmatrix2f bmat2d=fmath::InverseMatrix2x2(amat2d);
-        bmat.xx=bmat2d.a11; bmat.xy=0; bmat.xz=bmat2d.a12;
-                            bmat.yy=0; bmat.yz=0;
-                                        bmat.zz=bmat2d.a22;
-      }
-    }
+    //-Kernel Gradient Correction (KGC)
+    tsymatrix3f bmat={1,0,0,1,0,1}; //< Unit Matrix (I)
+    float detp1;
+    if(kgc)detp1=fmath::Determinant3x3(kgcmat[p1]);
+    //-Non-Symmetric KGC
+    bool kgcnosym=tkgc==KGC_Momentum && !ftp1 && detp1>KgcThreshold;
+    if(kgc && kgcnosym)bmat=fmath::InverseMatrix3x3(kgcmat[p1],detp1);
 
     //-Search for neighbours in adjacent cells.
     const StNgSearch ngs=nsearch::Init(dcell[p1],boundp2,divdata);
@@ -737,7 +728,16 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
           tfloat4 velrhop2=velrhop[p2];
           if(rsym)velrhop2.y=-velrhop2.y; //<vs_syymmetry>
 
-          if(apply_kgc){
+          //-Symmetric KGC
+          bool kgcsym=tkgc==KGC_SymMomentum && !ftp1 && CODE_IsFluid(code[p2]) && detp1>KgcThreshold;
+          if(kgc && kgcsym){
+            const tsymatrix3f &amat=(kgcmat[p1]+kgcmat[p2])*0.5;
+            bmat=fmath::InverseMatrix3x3(amat);
+          }
+
+          //-Apply KGC only if other one was culculated.
+          const bool applykgc=kgcnosym || kgcsym;
+          if(kgc && applykgc){
             //-Correct the gradient terms (frx_corr=B*frx)
             frxbar=frx*bmat.xx+fry*bmat.xy+frz*bmat.xz;
             frybar=frx*bmat.xy+fry*bmat.yy+frz*bmat.yz;
@@ -1021,10 +1021,10 @@ void JSphCpu::ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos,const 
           const float volp2=MassFluid/velrhop[p2].w;   // Only fluid particles are summed.
           
           //-Compute matrix elements (symmetric)
-          const float facvol=fac*volp2;
-          kgcmat[p1].xx-=drx*drx*facvol;  kgcmat[p1].xy-=drx*dry*facvol;  kgcmat[p1].xz-=drx*drz*facvol;
-                                          kgcmat[p1].yy-=dry*dry*facvol;  kgcmat[p1].yz-=dry*drz*facvol;
-                                                                          kgcmat[p1].zz-=drz*drz*facvol;
+          const float vfac=fac*volp2;
+          kgcmat[p1].xx-=drx*drx*vfac; kgcmat[p1].xy-=drx*dry*vfac; kgcmat[p1].xz-=drx*drz*vfac;
+                                       kgcmat[p1].yy-=dry*dry*vfac; kgcmat[p1].yz-=dry*drz*vfac;
+                                                                    kgcmat[p1].zz-=drz*drz*vfac;
         }
       }
     }
@@ -1035,7 +1035,7 @@ void JSphCpu::ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos,const 
 /// Interaction of Fluid-Fluid/Bound & Bound-Fluid (forces and DEM).
 /// Interaccion Fluid-Fluid/Bound & Bound-Fluid (forces and DEM).
 //==============================================================================
-template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool shift,bool kgc,bool sim2d>
+template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool shift,bool kgc>
   void JSphCpu::Interaction_ForcesCpuT(const stinterparmsc &t,StInterResultc &res)const
 {
   float viscdt=res.viscdt;
@@ -1043,13 +1043,13 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
     if(kgc)ComputeKgcMat<tker>(t.npf,t.npb,t.pos,t.velrhop,t.code,t.divdata,t.dcell,t.kgcmat);
 
     //-Interaction Fluid-Fluid.
-    InteractionForcesFluid<tker,ftmode,tvisco,tdensity,shift,kgc,sim2d> (t.npf,t.npb,false,Visco                 
-      ,t.divdata,t.dcell,t.spstau,t.spsgradvel,t.kgcmat,t.pos,t.velrhop,t.code,t.idp,t.press,t.dengradcorr
-      ,viscdt,t.ar,t.ace,t.delta,t.shiftmode,t.shiftposfs);
+    InteractionForcesFluid<tker,ftmode,tvisco,tdensity,shift,kgc> (t.npf,t.npb,false,Visco                 
+      ,t.divdata,t.dcell,t.spstau,t.spsgradvel,t.pos,t.velrhop,t.code,t.idp,t.press,t.dengradcorr
+      ,viscdt,t.ar,t.ace,t.delta,t.shiftmode,t.shiftposfs,t.tkgc,t.kgcmat);
     //-Interaction Fluid-Bound.
-    InteractionForcesFluid<tker,ftmode,tvisco,tdensity,shift,kgc,sim2d> (t.npf,t.npb,true ,Visco*ViscoBoundFactor
-      ,t.divdata,t.dcell,t.spstau,t.spsgradvel,t.kgcmat,t.pos,t.velrhop,t.code,t.idp,t.press,NULL
-      ,viscdt,t.ar,t.ace,t.delta,t.shiftmode,t.shiftposfs);
+    InteractionForcesFluid<tker,ftmode,tvisco,tdensity,shift,kgc> (t.npf,t.npb,true ,Visco*ViscoBoundFactor
+      ,t.divdata,t.dcell,t.spstau,t.spsgradvel,t.pos,t.velrhop,t.code,t.idp,t.press,NULL
+      ,viscdt,t.ar,t.ace,t.delta,t.shiftmode,t.shiftposfs,t.tkgc,t.kgcmat);
 
     //-Interaction of DEM Floating-Bound & Floating-Floating. //(DEM)
     if(UseDEM)InteractionForcesDEM(CaseNfloat,t.divdata,t.dcell
@@ -1066,16 +1066,9 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
   res.viscdt=viscdt;
 }
 //==============================================================================
-template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool shift,bool kgc>
-void JSphCpu::Interaction_Forces_ct7(const stinterparmsc &t,StInterResultc &res)const{
-  if(Simulate2D)Interaction_ForcesCpuT<tker,ftmode,tvisco,tdensity,shift,kgc,true >(t,res);
-  else          Interaction_ForcesCpuT<tker,ftmode,tvisco,tdensity,shift,kgc,false>(t,res);
-}
-//==============================================================================
-template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool shift>
-void JSphCpu::Interaction_Forces_ct6(const stinterparmsc &t,StInterResultc &res)const{
-  if(TKgc!=KGC_None)Interaction_Forces_ct7<tker,ftmode,tvisco,tdensity,shift,true >(t,res);
-  else              Interaction_Forces_ct7<tker,ftmode,tvisco,tdensity,shift,false>(t,res);
+template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool shift> void JSphCpu::Interaction_Forces_ct6(const stinterparmsc &t,StInterResultc &res)const{
+  if(TKgc!=KGC_None)Interaction_ForcesCpuT<tker,ftmode,tvisco,tdensity,shift,true >(t,res);
+  else              Interaction_ForcesCpuT<tker,ftmode,tvisco,tdensity,shift,false>(t,res);
 }
 //==============================================================================
 template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity> void JSphCpu::Interaction_Forces_ct5(const stinterparmsc &t,StInterResultc &res)const{

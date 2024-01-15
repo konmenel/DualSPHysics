@@ -535,7 +535,7 @@ void JSphCpuSingle::Interaction_Forces(TpInterStep interstep){
     ,Arc,Acec,Deltac
     ,ShiftingMode,ShiftPosfsc
     ,SpsTauc,SpsGradvelc
-    ,KgcMatc
+    ,TKgc,KgcMatc
   );
   StInterResultc res;
   res.viscdt=0;

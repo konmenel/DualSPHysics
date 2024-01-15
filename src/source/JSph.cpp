@@ -691,10 +691,16 @@ void JSph::LoadConfigParameters(const JXml *xml){
   switch(eparms.GetValueInt("KernelGradCorrection",true,0)){
     case 0:  TKgc=KGC_None;     break;
     case 1:  TKgc=KGC_Momentum;  break;
+    case 2:  TKgc=KGC_SymMomentum;  break;
     default: Run_ExceptioonFile("KernelGradCorrection mode in <execution><parameters> is not valid.",FileXml);
   }
   if(TKgc!=KGC_None){
-    KgcThreshold=eparms.GetValueFloat("KGCthreshold",true,0.6);
+    if(Simulate2D){
+      Log->PrintWarning("Kernel Gradient Correction is only supported for 3D simulations.");
+      TKgc=KGC_None;
+    }else{
+      KgcThreshold=eparms.GetValueFloat("KGCthreshold",true,0.6);
+    }
   }
 
   WrnPartsOut=(eparms.GetValueInt("WrnPartsOut",true,1)!=0);
@@ -846,6 +852,23 @@ void JSph::LoadConfigCommands(const JSphCfgRun *cfg){
     }
     if(!Shifting)Shifting=new JSphShifting(Simulate2D,Dp,KernelH);
     Shifting->ConfigBasic(shiftmode);
+  }
+
+  //-Kgc configuration
+  if(cfg->TKgc>=0){
+      switch(cfg->TKgc){
+      case 0:  TKgc=KGC_None;     break;
+      case 1:  TKgc=KGC_Momentum;  break;
+      case 2:  TKgc=KGC_SymMomentum;  break;
+      default: Run_ExceptioonFile("KernelGradCorrection mode is not valid.",FileXml);
+    }
+  }
+  if(TKgc!=KGC_None && cfg->KgcThreshold!=FLT_MAX){
+    if(Simulate2D){
+      Log->PrintWarning("Kernel Gradient Correction is only supported for 3D simulations.");
+    }else{
+      KgcThreshold=cfg->KgcThreshold;
+    }
   }
 
   if(cfg->CFLnumber>0)CFLnumber=cfg->CFLnumber;
@@ -3143,9 +3166,10 @@ std::string JSph::GetDDTName(TpDensity tdensity)const{
 std::string JSph::GetKGCName(TpKgc tkgc){
   string tx;
   switch(tkgc){
-    case KGC_None:      tx="None"; break;
-    case KGC_Momentum:  tx="Momentum equation"; break;
-    default:            tx="???";
+    case KGC_None:        tx="None"; break;
+    case KGC_Momentum:    tx="Momentum equation"; break;
+    case KGC_SymMomentum: tx="Symmetric Momentum equation"; break;
+    default:              tx="???";
   }
   return(tx);
 }

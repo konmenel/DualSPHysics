@@ -21,6 +21,7 @@
 #include "JSphCfgRun.h"
 #include "JAppInfo.h"
 #include "JDsphConfig.h"
+#include<float.h>
 
 using namespace std;
 
@@ -56,6 +57,8 @@ void JSphCfgRun::Reset(){
   DDTValue=-1;
   DDTValueTRamp=DDTValueTMax=DDTValueMax=0;  //<vs_ddramp>
   Shifting=-1;
+  TKgc=-1;
+  KgcThreshold=FLT_MAX;
   Sv_Binx=true; 
   Sv_Info=true;
   Sv_Vtk=false;
@@ -153,6 +156,12 @@ void JSphCfgRun::VisuInfo()const{
   printf("        nofixed    Shifting is not applied near fixed boundary\n");
   printf("        full       Shifting is always applied\n");
   printf("\n");
+  printf("    -kgc:<mode> Specifies the use of Kernel Gradient correction\n");
+  printf("        0          KGC is disabled (by default)\n");
+  printf("        1          KGC applied in momentum equation\n");
+  printf("        2          Particle symmetric KGC applied in momentum equation\n");
+  printf("    -kgcthreshold:<float> The threshold for the determinant of the correction matrix (0.6 by default)\n");
+  printf("\n");
 
   printf("  Simulation options:\n");
   printf("    -name <string>      Specifies path and name of the case \n");
@@ -237,6 +246,8 @@ void JSphCfgRun::VisuConfig()const{
   fun::PrintVar("  TDensity",TDensity,ln);
   fun::PrintVar("  DDTValue",DDTValue,ln);
   fun::PrintVar("  Shifting",Shifting,ln);
+  fun::PrintVar("  TKgc",TKgc,ln);
+  fun::PrintVar("  KGCThreshold",KgcThreshold,ln);
   fun::PrintVar("  SvRes",SvRes,ln);
   fun::PrintVar("  SvTimers",SvTimers,ln);
   fun::PrintVar("  SvDomainVtk",SvDomainVtk,ln);
@@ -359,6 +370,13 @@ void JSphCfgRun::LoadOpts(string *optlis,int optn,int lv,const std::string &file
         else if(tx=="NOFIXED")Shifting=2;
         else if(tx=="FULL")Shifting=3;
         else ErrorParm(opt,c,lv,file);
+      }
+      else if(txword=="KGC"){
+        TKgc=atoi(txoptfull.c_str()); 
+        if(TKgc<0 || TKgc>2)ErrorParm(opt,c,lv,file);
+      }
+      else if(txword=="KGCTHRESHOLD"){
+        DDTValue=float(atof(txoptfull.c_str())); 
       }
       else if(txword=="SVNORMALS")SvNormals=(txoptfull!=""? atoi(txoptfull.c_str()): 1)!=0;
       else if(txword=="SVRES")SvRes=(txoptfull!=""? atoi(txoptfull.c_str()): 1)!=0;

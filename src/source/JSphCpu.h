@@ -46,6 +46,7 @@ typedef struct{
   tfloat4 *shiftposfs;
   tsymatrix3f *spstau;
   tsymatrix3f *spsgradvel;
+  TpKgc tkgc;
   tsymatrix3f *kgcmat;
 }stinterparmsc;
 
@@ -58,7 +59,7 @@ inline stinterparmsc StInterparmsc(unsigned np,unsigned npb,unsigned npbok
   ,float* ar,tfloat3 *ace,float *delta
   ,TpShifting shiftmode,tfloat4 *shiftposfs
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
-  ,tsymatrix3f *kgcmat
+  ,TpKgc tkgc,tsymatrix3f *kgcmat
 )
 {
   stinterparmsc d={np,npb,npbok,(np-npb)
@@ -69,7 +70,7 @@ inline stinterparmsc StInterparmsc(unsigned np,unsigned npb,unsigned npbok
     ,ar,ace,delta
     ,shiftmode,shiftposfs
     ,spstau,spsgradvel
-    ,kgcmat
+    ,tkgc,kgcmat
   };
   return(d);
 }
@@ -224,24 +225,23 @@ protected:
     ,const tdouble3 *pos,const tfloat4 *velrhop,const typecode *code,const unsigned *id
     ,float &viscdt,float *ar)const;
 
-  template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool shift,bool kgc,bool sim2d> 
+  template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool shift,bool kgc> 
     void InteractionForcesFluid(unsigned n,unsigned pini,bool boundp2,float visco
     ,StDivDataCpu divdata,const unsigned *dcell
     ,const tsymatrix3f* tau,tsymatrix3f* gradvel
-    ,const tsymatrix3f* kgcmat
     ,const tdouble3 *pos,const tfloat4 *velrhop,const typecode *code,const unsigned *idp
     ,const float *press,const tfloat3 *dengradcorr
     ,float &viscdt,float *ar,tfloat3 *ace,float *delta
-    ,TpShifting shiftmode,tfloat4 *shiftposfs)const;
+    ,TpShifting shiftmode,tfloat4 *shiftposfs
+    ,TpKgc tkgc,const tsymatrix3f* kgcmat)const;
 
   void InteractionForcesDEM(unsigned nfloat,StDivDataCpu divdata,const unsigned *dcell
     ,const unsigned *ftridp,const StDemData* demobjs
     ,const tdouble3 *pos,const tfloat4 *velrhop,const typecode *code,const unsigned *idp
     ,float &viscdt,tfloat3 *ace)const;
 
-  template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool shift,bool kgc,bool sim2d> 
+  template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool shift,bool kgc>
     void Interaction_ForcesCpuT(const stinterparmsc &t,StInterResultc &res)const;
-  template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool shift,bool kgc> void Interaction_Forces_ct7(const stinterparmsc &t,StInterResultc &res)const;
   template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool shift> void Interaction_Forces_ct6(const stinterparmsc &t,StInterResultc &res)const;
   template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity> void Interaction_Forces_ct5(const stinterparmsc &t,StInterResultc &res)const;
   template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco> void Interaction_Forces_ct4(const stinterparmsc &t,StInterResultc &res)const;

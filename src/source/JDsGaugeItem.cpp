@@ -1382,7 +1382,7 @@ void JGaugePressure::CalculeGpu(double timestep,const StDivDataGpu &dvd
   if(!ptout){
     cugauge::Interaction_GaugePres(CSP,dvd,Point,posxy,posz,code,velrhop,aux);
     cudaMemcpy(&ptpres,aux,sizeof(float3),cudaMemcpyDeviceToHost);
-    Check_CudaErroor("Failed in velocity calculation.");
+    Check_CudaErroor("Failed in pressure calculation.");
   }
   //-Stores result. | Guarda resultado.
   Result.Set(timestep,ToTFloat3(Point),ptpres.x,ptpres.y);

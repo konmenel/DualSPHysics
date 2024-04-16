@@ -471,7 +471,7 @@ void Interaction_GaugePres(const StCteSph &CSP,const StDivDataGpu &dvd,tdouble3 
         ,dvd.kernelsize2,CSP.kernelh,CSP.massfluid,posxy,posz,code
         ,CSP.cteb,CSP.rhopzero,CSP.gamma,float(CSP.cs0),velrhop,ptpres);
     }break;
-    default: throw "Kernel unknown at Interaction_GaugeVel().";
+    default: throw "Kernel unknown at Interaction_GaugePres().";
   }
   //:info.PrintValuesFull(true); //info.PrintValuesInfo();
 }

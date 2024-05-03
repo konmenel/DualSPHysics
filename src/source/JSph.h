@@ -176,6 +176,8 @@ protected:
   TpStep TStep;               ///<Step Algorithm: Verlet or Symplectic.                                  | Algoritmo de paso: Verlet o Symplectic.
   int VerletSteps;            ///<Number of steps to apply Eulerian equations.
 
+  float GaussianNoiseMax;     ///<Adds noise to particle position at begining of simulation (percentage of Dp).
+
   TpKernel TKernel;                ///<Kernel type: Cubic or Wendland.
   fsph::StKCubicCte      KCubic;   ///<Constants for the Cubic Spline kernel.
   fsph::StKWendlandCte   KWend;    ///<Constants for the Wendland kernel.
@@ -442,6 +444,8 @@ protected:
   void LoadCodeParticles(unsigned np,const unsigned *idp,typecode *code)const;
   void LoadBoundNormals(unsigned np,unsigned npb,const unsigned *idp,const typecode *code,tfloat3 *boundnormal);
   void ConfigBoundNormals(unsigned np,unsigned npb,const tdouble3 *pos,const unsigned *idp,tfloat3 *boundnormal);
+
+  void AddGaussianNoise(tdouble3 *pos,tfloat4 *velrho,const typecode *code);
 
   void PrepareCfgDomainValues(tdouble3 &v,tdouble3 vdef=TDouble3(0))const;
   void ResizeMapLimits();

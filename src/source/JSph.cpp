@@ -65,6 +65,7 @@
 #include "JNumexLib.h"
 #include "JCaseUserVars.h"
 #include <algorithm>
+#include <random>
 
 using namespace std;
 
@@ -185,6 +186,7 @@ void JSph::InitVars(){
   UseNormals=false;
   UseNormalsFt=false;
   SvNormals=false;
+  GaussianNoiseMax=0;
   UseDEM=false;  //(DEM)
   delete[] DemData; DemData=NULL;  //(DEM)
   UseChrono=false;
@@ -621,6 +623,12 @@ void JSph::LoadConfigParameters(const JXml *xml){
   if(!filevisco.empty()){
     ViscoTime=new JDsViscoInput();
     ViscoTime->LoadFile(DirCase+filevisco);
+  }
+
+  //-Gaussian Noice Configuration
+  GaussianNoiseMax=eparms.GetValueFloat("GaussianNoiseMax",true,0.f);
+  if(GaussianNoiseMax<0){
+    Run_Exceptioon("Gaussian noise maximum should be a positive number.");
   }
 
   //-Boundary configuration.
@@ -1340,6 +1348,44 @@ void JSph::ConfigBoundNormals(unsigned np,unsigned npb,const tdouble3 *pos
     Log->PrintWarning("When mDBC is applied to floating bodies, their collisions should be solved using Chrono (RigidAlgorithm=3).");
 }
 
+void JSph::AddGaussianNoise(tdouble3 *pos,tfloat4 *velrho,const typecode *code){
+  const float max_dx = GaussianNoiseMax*Dp;
+  const float min_dx = -max_dx;
+  const float stdiv = max_dx/3; // max noise = 3 * sigma (standard deviation)
+  std::random_device rd{};
+  std::mt19937 gen{rd()};
+  std::normal_distribution<float> dist{0, stdiv};
+
+  const float overcteb=Gamma/(Cs0*Cs0*RhopZero);
+  const float cteb=Cs0*Cs0*RhopZero/Gamma;
+
+   #ifdef OMP_USE
+    #pragma omp parallel for schedule (static) if(CaseNp>OMP_LIMIT_COMPUTELIGHT)
+  #endif
+  for(int p=0;p<CaseNp;p++){
+    if(CODE_IsFluid(code[p])){
+      float dx, dy, dz;
+      #ifdef OMP_USE
+        #pragma omp critical
+      #endif
+      {
+        dx = std::max(std::min(max_dx,dist(gen)),min_dx);
+        dy = Simulate2D? 0.f : std::max(std::min(max_dx,dist(gen)),min_dx);
+        dz = std::max(std::min(max_dx,dist(gen)),min_dx);
+      }
+      const float old_press=cteb*(powf(velrho[p].w/RhopZero,Gamma)-1.0f);
+      float delta_pres = 0.f;
+      if (Gravity.x!=0)                delta_pres+=RhopZero*Gravity.x*dx;
+      if (Gravity.y!=0 && !Simulate2D) delta_pres+=RhopZero*Gravity.y*dy;
+      if (Gravity.z!=0)                delta_pres+=RhopZero*Gravity.z*dz;
+      const float rho_new=RhopZero*powf(overcteb*(old_press+delta_pres)+1.0f, 1/Gamma);
+
+      pos[p]=pos[p]+TDouble3(dx,dy,dz);
+      velrho[p].w=rho_new;
+    }
+  }
+}
+
 //==============================================================================
 /// Sets DBL_MAX values by indicated values.
 //==============================================================================
@@ -1487,6 +1533,8 @@ void JSph::VisuConfig(){
   if(FtMotSave)Log->Printf("SaveFtMotion=%s  (tout:%g)",(FtMotSave? "True": "False"),FtMotSave->GetTimeOut()); //<vs_ftmottionsv>
   Log->Print(fun::VarStr("SvTimers",SvTimers));
   if(DsPips)Log->Print(fun::VarStr("PIPS-steps",DsPips->StepsNum));
+  //-Gaussian Noise
+  if (GaussianNoiseMax > 0)Log->Printf("Gaussian Noise=%g (%g %% of Dp)", GaussianNoiseMax, GaussianNoiseMax/Dp * 100);
   //-Boundary. 
   Log->Print(fun::VarStr("Boundary",GetBoundName(TBoundary)));
   ConfigInfo=ConfigInfo+sep+GetBoundName(TBoundary);

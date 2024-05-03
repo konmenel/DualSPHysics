@@ -176,6 +176,9 @@ void JSphGpuSingle::ConfigDomain(){
   //-Creates PartsInit object with initial particle data for automatic configurations.
   CreatePartsInit(Np,AuxPos,Code);
 
+  //-Adds Gaussian Noise to fluid particles possition and fixes rho
+  if(GaussianNoiseMax>0)AddGaussianNoise(AuxPos,Velrhop,Code);
+
   //-Runs initialization operations from XML.
   RunInitialize(Np,Npb,AuxPos,Idp,Code,Velrhop,boundnormal);
   if(UseNormals)ConfigBoundNormals(Np,Npb,AuxPos,Idp,boundnormal);

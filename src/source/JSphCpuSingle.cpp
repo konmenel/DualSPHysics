@@ -134,6 +134,9 @@ void JSphCpuSingle::ConfigDomain(){
   //-Load normals for boundary particles (fixed and moving).
   if(UseNormals)LoadBoundNormals(Np,Npb,Idpc,Codec,BoundNormalc);
 
+  //-Adds Gaussian Noise to fluid particles possition and fixes rho
+  if(GaussianNoiseMax>0)AddGaussianNoise(Posc,Velrhopc,Codec);
+
   //-Runs initialization operations from XML.
   RunInitialize(Np,Npb,Posc,Idpc,Codec,Velrhopc,BoundNormalc);
   if(UseNormals)ConfigBoundNormals(Np,Npb,Posc,Idpc,BoundNormalc);

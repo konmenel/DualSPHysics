@@ -1349,12 +1349,11 @@ void JSph::ConfigBoundNormals(unsigned np,unsigned npb,const tdouble3 *pos
 }
 
 void JSph::AddGaussianNoise(tdouble3 *pos,tfloat4 *velrho,const typecode *code){
-  const float max_dx = GaussianNoiseMax*Dp;
-  const float min_dx = -max_dx;
-  const float stdiv = max_dx/3; // max noise = 3 * sigma (standard deviation)
-  std::random_device rd{};
-  std::mt19937 gen{rd()};
-  std::normal_distribution<float> dist{0, stdiv};
+  const float MAX_DX = GaussianNoiseMax*Dp;  // max noise = 3.5 * sigma (standard deviation)
+  const float MIN_DX = -MAX_DX;
+  const float STDIV = MAX_DX/3.5f;
+  std::mt19937 gen{std::random_device{}()};
+  std::normal_distribution<float> dist{0, STDIV};
 
   const float overcteb=Gamma/(Cs0*Cs0*RhopZero);
   const float cteb=Cs0*Cs0*RhopZero/Gamma;
@@ -1369,10 +1368,14 @@ void JSph::AddGaussianNoise(tdouble3 *pos,tfloat4 *velrho,const typecode *code){
         #pragma omp critical
       #endif
       {
-        dx = std::max(std::min(max_dx,dist(gen)),min_dx);
-        dy = Simulate2D? 0.f : std::max(std::min(max_dx,dist(gen)),min_dx);
-        dz = std::max(std::min(max_dx,dist(gen)),min_dx);
+        dx = dist(gen);
+        dy = Simulate2D? 0.f : dist(gen);
+        dz = dist(gen);
       }
+      dx = std::max(std::min(MAX_DX,dx),MIN_DX);
+      dy = std::max(std::min(MAX_DX,dy),MIN_DX);
+      dz = std::max(std::min(MAX_DX,dz),MIN_DX);
+
       const float old_press=cteb*(powf(velrho[p].w/RhopZero,Gamma)-1.0f);
       float delta_pres = 0.f;
       if (Gravity.x!=0)                delta_pres+=RhopZero*Gravity.x*dx;

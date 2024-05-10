@@ -1537,7 +1537,7 @@ void JSph::VisuConfig(){
   Log->Print(fun::VarStr("SvTimers",SvTimers));
   if(DsPips)Log->Print(fun::VarStr("PIPS-steps",DsPips->StepsNum));
   //-Gaussian Noise
-  if (GaussianNoiseMax > 0)Log->Printf("Gaussian Noise=%g (%g %% of Dp)", GaussianNoiseMax, GaussianNoiseMax/Dp * 100);
+  if (GaussianNoiseMax > 0)Log->Printf("Gaussian Noise=%g (%g %%) of Dp", GaussianNoiseMax, GaussianNoiseMax*100);
   //-Boundary. 
   Log->Print(fun::VarStr("Boundary",GetBoundName(TBoundary)));
   ConfigInfo=ConfigInfo+sep+GetBoundName(TBoundary);

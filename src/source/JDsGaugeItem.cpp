@@ -1347,7 +1347,7 @@ void JGaugePressure::UpdateLinkPoint(){
         rot.a31, rot.a32, rot.a33, center.z,
               0,       0,       0,        1);
       tdouble3 p2 = MatrixMulPoint(mat, RelDist);
-      if(CSP.simulate2d)p2.y=0;
+      if(CSP.simulate2d)p2.y=Point.y;
       Point=p2;
     }
     else if (TypeParts==TpPartMoving){
@@ -1355,12 +1355,12 @@ void JGaugePressure::UpdateLinkPoint(){
       if(motobj.type==MOTT_Linear){//-Linear movement.
         tdouble3 mov=motobj.linmov;
         tdouble3 p2=Point+mov;
-        if(CSP.simulate2d)p2.y=0;
+        if(CSP.simulate2d)p2.y=Point.y;
         Point=p2;
       }
       else if(motobj.type==MOTT_Matrix){//-Matrix movement (for rotations).
         tdouble3 p2 = MatrixMulPoint(motobj.matmov, Point);
-        if(CSP.simulate2d)p2.y=0;
+        if(CSP.simulate2d)p2.y=Point.y;
         Point=p2;
       }  
     }

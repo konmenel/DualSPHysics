@@ -69,7 +69,7 @@ ifeq ($(CUDAVER),11)
 endif
 ifeq ($(CUDAVER),12)
   DIRTOOLKIT=/usr/local/cuda-12
-  DIRTOOLKIT=/opt/cuda/
+  DIRTOOLKIT=/opt/cuda
 endif
 
 

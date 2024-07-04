@@ -1347,7 +1347,7 @@ void JGaugePressure::UpdateLinkPoint(){
         rot.a31, rot.a32, rot.a33, center.z,
               0,       0,       0,        1);
       tdouble3 p2 = MatrixMulPoint(mat, RelDist);
-      if(CSP.simulate2d)p2.y=0;
+      if(CSP.simulate2d)p2.y=Point.y;
       Point=p2;
     }
     else if (TypeParts==TpPartMoving){
@@ -1355,12 +1355,12 @@ void JGaugePressure::UpdateLinkPoint(){
       if(motobj.type==MOTT_Linear){//-Linear movement.
         tdouble3 mov=motobj.linmov;
         tdouble3 p2=Point+mov;
-        if(CSP.simulate2d)p2.y=0;
+        if(CSP.simulate2d)p2.y=Point.y;
         Point=p2;
       }
       else if(motobj.type==MOTT_Matrix){//-Matrix movement (for rotations).
         tdouble3 p2 = MatrixMulPoint(motobj.matmov, Point);
-        if(CSP.simulate2d)p2.y=0;
+        if(CSP.simulate2d)p2.y=Point.y;
         Point=p2;
       }  
     }
@@ -1369,7 +1369,7 @@ void JGaugePressure::UpdateLinkPoint(){
 
 #ifdef _WITHGPU
 //==============================================================================
-/// Calculates velocity at indicated points (on GPU).
+/// Calculates pressure at indicated points (on GPU).
 //==============================================================================
 void JGaugePressure::CalculeGpu(double timestep,const StDivDataGpu &dvd
   ,unsigned npbok,unsigned npb,unsigned np,const double2 *posxy,const double *posz
@@ -1382,7 +1382,7 @@ void JGaugePressure::CalculeGpu(double timestep,const StDivDataGpu &dvd
   if(!ptout){
     cugauge::Interaction_GaugePres(CSP,dvd,Point,posxy,posz,code,velrhop,aux);
     cudaMemcpy(&ptpres,aux,sizeof(float3),cudaMemcpyDeviceToHost);
-    Check_CudaErroor("Failed in velocity calculation.");
+    Check_CudaErroor("Failed in pressure calculation.");
   }
   //-Stores result. | Guarda resultado.
   Result.Set(timestep,ToTFloat3(Point),ptpres.x,ptpres.y);
@@ -1467,7 +1467,7 @@ void JGaugePressure::UpdateLinkPointGpu(){
         rot.a31, rot.a32, rot.a33, center.z,
               0,       0,       0,        1);
       tdouble3 p2 = MatrixMulPoint(mat, RelDist);
-      if(CSP.simulate2d)p2.y=0;
+      if(CSP.simulate2d)p2.y=Point.y;
       Point=p2;
     }
     else if (TypeParts==TpPartMoving){
@@ -1475,12 +1475,12 @@ void JGaugePressure::UpdateLinkPointGpu(){
       if(motobj.type==MOTT_Linear){//-Linear movement.
         tdouble3 mov=motobj.linmov;
         tdouble3 p2=Point+mov;
-        if(CSP.simulate2d)p2.y=0;
+        if(CSP.simulate2d)p2.y=Point.y;
         Point=p2;
       }
       else if(motobj.type==MOTT_Matrix){//-Matrix movement (for rotations).
         tdouble3 p2 = MatrixMulPoint(motobj.matmov, Point);
-        if(CSP.simulate2d)p2.y=0;
+        if(CSP.simulate2d)p2.y=Point.y;
         Point=p2;
       }  
     }

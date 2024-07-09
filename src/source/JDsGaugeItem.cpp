@@ -1117,14 +1117,6 @@ JGaugePressure::JGaugePressure(unsigned idx,std::string name,tdouble3 point
   FtAnglesg=NULL;
   #endif
   RelDist=TDouble3(0);
-
-  /* ****TO BE MOVE TO DIFFERENT FUNCTION, SOMETHING LIKE "ConfigureLink"******
-   *
-  if(activelink && typeparts==TpPartFloating) RelDist=point-ftobj->center;
-
-  if(activelink && (motobj==NULL && ftobj==NULL))Run_Exceptioon("Both floating and motion pointers are null but link is active");
-  * *****************************************************************************
-  */
 }
 
 //==============================================================================

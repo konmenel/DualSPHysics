@@ -163,7 +163,7 @@ protected:
   tsymatrix3f *SpsTauc;       ///<SPS sub-particle stress tensor.
   tsymatrix3f *SpsGradvelc;   ///<Velocity gradients.
 
-  //-Variables for Kernal Correction
+  //-Variables for Kernel Gradient Correction
   tsymatrix3f *KgcMatc;     ///<The correction matrix "A".
 
   JDsTimersCpu *Timersc;  ///<Manages timers for CPU execution.

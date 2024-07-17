@@ -523,12 +523,29 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
   ,TpKgc tkgc,const tsymatrix3f *kgcmat,float kgcthreshold,bool sim2d)
 {
   //-Kernel Gradient Correction (KGC)
-  tsymatrix3f bmat={1,0,0,1,0,1}; //< Unit Matrix (I)
-  float detp1;
-  if(kgc)detp1=cumath::Determinant3x3(kgcmat[p1]);
+  tsymatrix3f bmat{1,0,0,1,0,1}; //< Unit Matrix (I)
+  float detp1 = 0.0f;
+  if(kgc){
+    if(sim2d){
+        const tsymatrix3f &kgcmatp1=kgcmat[p1];
+        const tmatrix2f amat2d = {kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
+        detp1=cumath::Determinant2x2(amat2d);
+      }else{
+        detp1=cumath::Determinant3x3(kgcmat[p1]);
+      }
+  }
   //-Non-Symmetric KGC
-  bool kgcnosym=tkgc==KGC_Momentum && !ftp1 && detp1>kgcthreshold;
-  if(kgc && kgcnosym)bmat=cumath::InverseMatrix3x3(kgcmat[p1],detp1);
+  // bool kgcnosym=tkgc==KGC_Momentum && CODE_IsFluid(code[p1]) && detp1>kgcthreshold;
+  if(kgc && tkgc==KGC_Momentum && detp1>kgcthreshold){
+    if(sim2d){
+        const tsymatrix3f &kgcmatp1=kgcmat[p1];
+        const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
+        const tmatrix2f &inv_a=cumath::InverseMatrix2x2(amat2d, detp1);
+        bmat=tsymatrix3f{inv_a.a11, 0.0f, inv_a.a12, 0.0f, 0.0f, inv_a.a22};
+      }else{
+        bmat=cumath::InverseMatrix3x3(kgcmat[p1],detp1);
+      }
+  }
 
   for(int p2=pini;p2<pfin;p2++){
     const float4 pscellp2=poscell[p2];
@@ -562,17 +579,27 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
       }
 
       //-Symmetric KGC
-      bool kgcsym=tkgc==KGC_SymMomentum && !ftp1 && CODE_IsFluid(code[p2]) && detp1>kgcthreshold;
-      if(kgc && kgcsym){
+      // const bool kgcsym=tkgc==KGC_SymMomentum && CODE_IsFluid(code[p1]) && CODE_IsFluid(code[p2]);
+      if(kgc && tkgc==KGC_SymMomentum && !boundp2 && (USE_NOFLOATING || !ftp2) && detp1>kgcthreshold){
         using cumath::AddMatrix3x3;
         using cumath::MulMatrix3x3;
         const tsymatrix3f &amat=MulMatrix3x3(AddMatrix3x3(kgcmat[p1],kgcmat[p2]),0.5); //< (Ai+Aj)/2
-        bmat=cumath::InverseMatrix3x3(amat);
+        if(sim2d){
+          const tmatrix2f amat2d{amat.xx, amat.xz, amat.xz, amat.zz};
+          const float detamat=cumath::Determinant2x2(amat2d);
+          if(detamat>kgcthreshold){
+            const tmatrix2f &inv_a=cumath::InverseMatrix2x2(amat2d, detamat);
+            bmat=tsymatrix3f{inv_a.a11, 0.0f, inv_a.a12, 0.0f, 0.0f, inv_a.a22};
+          }
+        }else{
+          const float detamat=cumath::Determinant3x3(amat);
+          if(detamat>kgcthreshold)bmat=cumath::InverseMatrix3x3(amat, detamat);
+        }
       }
 
       //-Apply KGC only if either one was computed.
-      const bool applykgc=kgcnosym || kgcsym;
-      if(kgc && applykgc){
+      // const bool applykgc=kgcnosym || kgcsym;
+      if(kgc){
         //-Correct the gradient terms (frx_corr=B*frx)
         frxbar=frx*bmat.xx+fry*bmat.xy+frz*bmat.xz;
         frybar=frx*bmat.xy+fry*bmat.yy+frz*bmat.yz;

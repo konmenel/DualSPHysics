@@ -695,12 +695,7 @@ void JSph::LoadConfigParameters(const JXml *xml){
     default: Run_ExceptioonFile("KernelGradCorrection mode in <execution><parameters> is not valid.",FileXml);
   }
   if(TKgc!=KGC_None){
-    if(Simulate2D){
-      Log->PrintWarning("Kernel Gradient Correction is only supported for 3D simulations.");
-      TKgc=KGC_None;
-    }else{
-      KgcThreshold=eparms.GetValueFloat("KGCthreshold",true,0.6);
-    }
+    KgcThreshold=eparms.GetValueFloat("KGCthreshold",true,0.6);
   }
 
   WrnPartsOut=(eparms.GetValueInt("WrnPartsOut",true,1)!=0);

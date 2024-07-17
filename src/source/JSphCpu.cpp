@@ -632,7 +632,9 @@ template<TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionForcesBound
   for(int th=0;th<OmpThreads;th++)if(viscdt<viscth[th*OMP_STRIDE])viscdt=viscth[th*OMP_STRIDE];
 }
 
+//! DELETE THIS
 #define PrintTSymatrixf(mat) printf("%s:\n%.4f,%.4f,%.4f\n%.4f,%.4f,%.4f\n,%.4f,%.4f,%.4f\n", #mat,(mat).xx,(mat).xy,(mat).xz,(mat).xy,(mat).yy,(mat).yz,(mat).xz,(mat).yz,(mat).zz)
+//! DELETE THIS
 
 //==============================================================================
 /// Perform interaction between particles: Fluid/Float-Fluid/Float or Fluid/Float-Bound
@@ -682,12 +684,29 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
     const bool rsymp1=(Symmetry && posp1.y<=KernelSize); //<vs_syymmetry>
 
     //-Kernel Gradient Correction (KGC)
-    tsymatrix3f bmat={1,0,0,1,0,1}; //< Unit Matrix (I)
-    float detp1;
-    if(kgc)detp1=fmath::Determinant3x3(kgcmat[p1]);
+    tsymatrix3f bmat{1,0,0,1,0,1}; //< Unit Matrix (I)
+    float detp1 = 0.0f;
+    if(kgc){
+      if(Simulate2D){
+        const tsymatrix3f &kgcmatp1=kgcmat[p1];
+        const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
+        detp1=fmath::Determinant2x2(amat2d);
+      }else{
+        detp1=fmath::Determinant3x3(kgcmat[p1]);
+      }
+    }
     //-Non-Symmetric KGC
-    bool kgcnosym=tkgc==KGC_Momentum && !ftp1 && detp1>KgcThreshold;
-    if(kgc && kgcnosym)bmat=fmath::InverseMatrix3x3(kgcmat[p1],detp1);
+    // bool kgcnosym=tkgc==KGC_Momentum && CODE_IsFluid(code[p1]) && detp1>KgcThreshold;
+    if(kgc && tkgc==KGC_Momentum && detp1>KgcThreshold){
+      if(Simulate2D){
+        const tsymatrix3f &kgcmatp1=kgcmat[p1];
+        const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
+        const tmatrix2f &inv_a=fmath::InverseMatrix2x2(amat2d, detp1);
+        bmat=tsymatrix3f{inv_a.a11, 0.0f, inv_a.a12, 0.0f, 0.0f, inv_a.a22};
+      }else{
+        bmat=fmath::InverseMatrix3x3(kgcmat[p1],detp1);
+      }
+    }
 
     //-Search for neighbours in adjacent cells.
     const StNgSearch ngs=nsearch::Init(dcell[p1],boundp2,divdata);
@@ -729,15 +748,25 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
           if(rsym)velrhop2.y=-velrhop2.y; //<vs_syymmetry>
 
           //-Symmetric KGC
-          bool kgcsym=tkgc==KGC_SymMomentum && !ftp1 && CODE_IsFluid(code[p2]) && detp1>KgcThreshold;
-          if(kgc && kgcsym){
+          // const bool kgcsym=tkgc==KGC_SymMomentum && CODE_IsFluid(code[p1]) && CODE_IsFluid(code[p2]);
+          if(kgc && tkgc==KGC_SymMomentum && !boundp2 && !ftp2 && detp1>KgcThreshold){
             const tsymatrix3f &amat=(kgcmat[p1]+kgcmat[p2])*0.5;
-            bmat=fmath::InverseMatrix3x3(amat);
+            if(Simulate2D){
+              const tmatrix2f amat2d{amat.xx, amat.xz, amat.xz, amat.zz};
+              const float detamat=fmath::Determinant2x2(amat2d);
+              if(detamat>KgcThreshold){
+                const tmatrix2f &inv_a=fmath::InverseMatrix2x2(amat2d, detamat);
+                bmat=tsymatrix3f{inv_a.a11, 0.0f, inv_a.a12, 0.0f, 0.0f, inv_a.a22};
+              }
+            }else{
+              const float detamat=fmath::Determinant3x3(amat);
+              if(detamat>KgcThreshold)bmat=fmath::InverseMatrix3x3(amat, detamat);
+            }
           }
 
           //-Apply KGC only if other one was culculated.
-          const bool applykgc=kgcnosym || kgcsym;
-          if(kgc && applykgc){
+          // const bool applykgc=kgcnosym || kgcsym;
+          if(kgc){
             //-Correct the gradient terms (frx_corr=B*frx)
             frxbar=frx*bmat.xx+fry*bmat.xy+frz*bmat.xz;
             frybar=frx*bmat.xy+fry*bmat.yy+frz*bmat.yz;

@@ -87,6 +87,9 @@ void JSphCpu::InitVars(){
   PosPrec=NULL; VelrhopPrec=NULL; //-Symplectic
   SpsTauc=NULL; SpsGradvelc=NULL; //-Laminar+SPS.
   KgcMatc=NULL;                   //-Kernel Correction
+  //! DELETE THIS
+  GradPresc=NULL;
+  //! DELETE THIS
   Arc=NULL; Acec=NULL; Deltac=NULL;
   ShiftPosfsc=NULL;               //-Shifting.
   Pressc=NULL;
@@ -163,6 +166,9 @@ void JSphCpu::AllocCpuMemoryParticles(unsigned np,float over){
   ArraysCpu->AddArrayCount(JArraysCpu::SIZE_12B,1); //-ace
   ArraysCpu->AddArrayCount(JArraysCpu::SIZE_16B,2); //-velrhop,poscell
   ArraysCpu->AddArrayCount(JArraysCpu::SIZE_24B,2); //-pos
+  //! DELETE THIS
+  ArraysCpu->AddArrayCount(JArraysCpu::SIZE_12B,2); //-GradPres and one for saving
+  //! DELETE THIS
   if(TStep==STEP_Verlet){
     ArraysCpu->AddArrayCount(JArraysCpu::SIZE_16B,1); //-velrhopm1
   }
@@ -209,6 +215,9 @@ void JSphCpu::ResizeCpuMemoryParticles(unsigned npnew){
   tsymatrix3f *spstau     =SaveArrayCpu(Np,SpsTauc);
   tfloat3     *boundnormal=SaveArrayCpu(Np,BoundNormalc);
   tfloat3     *motionvel  =SaveArrayCpu(Np,MotionVelc);
+  //! DELETE THIS
+  tfloat3     *gradpres   =SaveArrayCpu(Np,GradPresc);
+  //! DELETE THIS
   //-Frees pointers.
   ArraysCpu->Free(Idpc);
   ArraysCpu->Free(Codec);
@@ -221,6 +230,9 @@ void JSphCpu::ResizeCpuMemoryParticles(unsigned npnew){
   ArraysCpu->Free(SpsTauc);
   ArraysCpu->Free(BoundNormalc);
   ArraysCpu->Free(MotionVelc);
+  //! DELETE THIS
+  ArraysCpu->Free(GradPresc);
+  //! DELETE THIS
   //-Resizes CPU memory allocation.
   const double mbparticle=(double(MemCpuParticles)/(1024*1024))/CpuParticlesSize; //-MB por particula.
   Log->Printf("**JSphCpu: Requesting cpu memory for %u particles: %.1f MB.",npnew,mbparticle*npnew);
@@ -231,6 +243,9 @@ void JSphCpu::ResizeCpuMemoryParticles(unsigned npnew){
   Dcellc  =ArraysCpu->ReserveUint();
   Posc    =ArraysCpu->ReserveDouble3();
   Velrhopc=ArraysCpu->ReserveFloat4();
+  //! DELETE THIS
+  GradPresc=ArraysCpu->ReserveFloat3();
+  //! DELETE THIS
   if(velrhopm1)  VelrhopM1c  =ArraysCpu->ReserveFloat4();
   if(pospre)     PosPrec     =ArraysCpu->ReserveDouble3();
   if(velrhoppre) VelrhopPrec =ArraysCpu->ReserveFloat4();
@@ -249,6 +264,9 @@ void JSphCpu::ResizeCpuMemoryParticles(unsigned npnew){
   RestoreArrayCpu(Np,spstau,SpsTauc);
   RestoreArrayCpu(Np,boundnormal,BoundNormalc);
   RestoreArrayCpu(Np,motionvel,MotionVelc);
+  //! DELETE THIS
+  RestoreArrayCpu(Np,gradpres,GradPresc);
+  //! DELETE THIS
   //-Updates values.
   CpuParticlesSize=npnew;
   MemCpuParticles=ArraysCpu->GetAllocMemoryCpu();
@@ -375,6 +393,12 @@ unsigned JSphCpu::GetParticlesData(unsigned n,unsigned pini,bool onlynormal
   return(num);
 }
 
+//! DELETE THIS
+void JSphCpu::GetParticlesDataGradPres(unsigned n,unsigned pini,tfloat3 *gradpres){
+  if(gradpres)memcpy(gradpres,GradPresc+pini,sizeof(tfloat3)*n);
+}
+//! DELETE THIS
+
 //==============================================================================
 /// Load the execution configuration with OpenMP.
 /// Carga la configuracion de ejecucion con OpenMP.
@@ -442,6 +466,9 @@ void JSphCpu::PreInteractionVars_Forces(unsigned np,unsigned npb){
   memset(Acec,0,sizeof(tfloat3)*np);                                 //Acec[]=(0,0,0)
   if(SpsGradvelc)memset(SpsGradvelc+npb,0,sizeof(tsymatrix3f)*npf);  //SpsGradvelc[]=(0,0,0,0,0,0).
   if(KgcMatc)memset(KgcMatc+npb,0,sizeof(tsymatrix3f)*npf);          //KgcMatc[]=(0,0,0,0,0,0).
+  //! DETELE THIS
+  memset(GradPresc+npb,0,sizeof(tfloat3)*npf);
+  //! DETELE THIS
 
   //-Select particles for shifting.
   if(ShiftPosfsc)Shifting->InitCpu(npf,npb,Posc,ShiftPosfsc);
@@ -648,7 +675,7 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
   ,const float *press,const tfloat3 *dengradcorr
   ,float &viscdt,float *ar,tfloat3 *ace,float *delta
   ,TpShifting shiftmode,tfloat4 *shiftposfs
-  ,TpKgc tkgc,const tsymatrix3f* kgcmat)const
+  ,TpKgc tkgc,const tsymatrix3f* kgcmat/*! DELETE THIS */,tfloat3 *gradpres/*! DELETE THIS */)const
 {
   //-Initialize viscth to calculate viscdt maximo con OpenMP. | Inicializa viscth para calcular visdt maximo con OpenMP.
   float viscth[OMP_MAXTHREADS*OMP_STRIDE];
@@ -661,6 +688,9 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
   for(int p1=int(pinit);p1<pfin;p1++){
     float visc=0,arp1=0,deltap1=0;
     tfloat3 acep1=TFloat3(0);
+    //! DELETE THIS
+    tfloat3 gradpresp1=TFloat3(0);
+    //! DELETE THIS
     tsymatrix3f gradvelp1={0,0,0,0,0,0};
 
     //-Variables for Shifting.
@@ -685,6 +715,7 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
 
     //-Kernel Gradient Correction (KGC)
     tsymatrix3f bmat{1,0,0,1,0,1}; //< Unit Matrix (I)
+    if(Simulate2D)bmat.yy=0;
     float detp1 = 0.0f;
     if(kgc){
       if(Simulate2D){
@@ -779,6 +810,22 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
             const float p_vpm=-prs*massp2;
             acep1.x+=p_vpm*frxbar; acep1.y+=p_vpm*frybar; acep1.z+=p_vpm*frzbar;
           }
+          //! DELETE THIS
+          if(CODE_IsFluid(code[p1])){
+            const float prs=(pressp1+press[p2])/velrhop2.w;
+            const float p_vpm=prs*massp2;
+            float frxbar_=frx;
+            float frybar_=fry;
+            float frzbar_=frz;
+            if(kgc){
+              const tsymatrix3f b=fmath::InverseMatrix3x3(kgcmat[p1],detp1);
+              frxbar_=frx*bmat.xx+fry*bmat.xy+frz*bmat.xz;
+              frybar_=frx*bmat.xy+fry*bmat.yy+frz*bmat.yz;
+              frzbar_=frx*bmat.xz+fry*bmat.yz+frz*bmat.zz;
+            }
+            gradpresp1.x+=p_vpm*frxbar_; gradpresp1.y+=p_vpm*frybar_; gradpresp1.z+=p_vpm*frzbar_;
+          }
+          //! DELETE THIS
 
           //-Density derivative (Continuity equation).
           const float dvx=velp1.x-velrhop2.x, dvy=velp1.y-velrhop2.y, dvz=velp1.z-velrhop2.z;
@@ -869,6 +916,9 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
       }
       ar[p1]+=arp1;
       ace[p1]=ace[p1]+acep1;
+      //! DELETE THIS
+      gradpres[p1]=gradpres[p1]+gradpresp1;
+      //! DELETE THIS
       const int th=omp_get_thread_num();
       if(visc>viscth[th*OMP_STRIDE])viscth[th*OMP_STRIDE]=visc;
       if(tvisco==VISCO_LaminarSPS){
@@ -881,6 +931,18 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
       }
       if(shift)shiftposfs[p1]=shiftposfsp1;
     }
+    //! DELETE THIS
+    #if 0
+    if(gradpresp1.x != 0 || gradpresp1.y != 0 || gradpresp1.z != 0){
+      if(idp[p1] == 7632){
+        printf("Particle %u [%.3f,%.3f,%.3f] pressure gradient = [%.3f,%.3f,%.3f]\n",idp[p1],posp1.x,posp1.y,posp1.z,gradpres[p1].x,gradpres[p1].y,gradpres[p1].z);
+      }
+      else if(idp[p1] == 7642){
+        printf("Particle %u [%.3f,%.3f,%.3f] pressure gradient = [%.3f,%.3f,%.3f]\n",idp[p1],posp1.x,posp1.y,posp1.z,gradpres[p1].x,gradpres[p1].y,gradpres[p1].z);
+      }
+    }
+    #endif
+    //! DELETE THIS
   }
   //-Keep max value in viscdt. | Guarda en viscdt el valor maximo.
   for(int th=0;th<OmpThreads;th++)if(viscdt<viscth[th*OMP_STRIDE])viscdt=viscth[th*OMP_STRIDE];
@@ -1033,7 +1095,7 @@ void JSphCpu::ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos,const 
     const tdouble3 posp1=pos[p1];
 
     //-Search for neighbours in adjacent cells.
-    const StNgSearch ngs=nsearch::Init(dcell[p1],false,divdata);
+    const StNgSearch ngs=nsearch::Init(posp1,false,divdata);
     for(int z=ngs.zini;z<ngs.zfin;z++)for(int y=ngs.yini;y<ngs.yfin;y++){
       const tuint2 pif=nsearch::ParticleRange(y,z,ngs,divdata);
 
@@ -1074,11 +1136,11 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
     //-Interaction Fluid-Fluid.
     InteractionForcesFluid<tker,ftmode,tvisco,tdensity,shift,kgc> (t.npf,t.npb,false,Visco                 
       ,t.divdata,t.dcell,t.spstau,t.spsgradvel,t.pos,t.velrhop,t.code,t.idp,t.press,t.dengradcorr
-      ,viscdt,t.ar,t.ace,t.delta,t.shiftmode,t.shiftposfs,t.tkgc,t.kgcmat);
+      ,viscdt,t.ar,t.ace,t.delta,t.shiftmode,t.shiftposfs,t.tkgc,t.kgcmat/*! DELETE THIS*/,t.gradpres/*! DELETE THIS*/);
     //-Interaction Fluid-Bound.
     InteractionForcesFluid<tker,ftmode,tvisco,tdensity,shift,kgc> (t.npf,t.npb,true ,Visco*ViscoBoundFactor
       ,t.divdata,t.dcell,t.spstau,t.spsgradvel,t.pos,t.velrhop,t.code,t.idp,t.press,NULL
-      ,viscdt,t.ar,t.ace,t.delta,t.shiftmode,t.shiftposfs,t.tkgc,t.kgcmat);
+      ,viscdt,t.ar,t.ace,t.delta,t.shiftmode,t.shiftposfs,t.tkgc,t.kgcmat/*! DELETE THIS*/,t.gradpres/*! DELETE THIS*/);
 
     //-Interaction of DEM Floating-Bound & Floating-Floating. //(DEM)
     if(UseDEM)InteractionForcesDEM(CaseNfloat,t.divdata,t.dcell

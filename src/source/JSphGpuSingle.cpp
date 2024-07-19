@@ -154,6 +154,9 @@ void JSphGpuSingle::ConfigDomain(){
   memcpy(AuxPos,PartsLoaded->GetPos(),sizeof(tdouble3)*Np);
   memcpy(Idp,PartsLoaded->GetIdp(),sizeof(unsigned)*Np);
   memcpy(Velrhop,PartsLoaded->GetVelRhop(),sizeof(tfloat4)*Np);
+  //! DELETE THIS
+  memset(GradPres,0,sizeof(tfloat3)*Np);
+  //! DELETE THIS
 
   //-Computes radius of floating bodies.
   if(CaseNfloat && PeriActive!=0 && !PartBegin)CalcFloatingRadius(Np,AuxPos,Idp);
@@ -300,10 +303,10 @@ void JSphGpuSingle::RunPeriodic(){
             run=false;
             //-Create new periodic particles duplicating the particles from the list
             //-Crea nuevas particulas periodicas duplicando las particulas de la lista.
-            if(TStep==STEP_Verlet)cusph::PeriodicDuplicateVerlet(count,Np,DomCells,perinc,listpg,Idpg,Codeg,Dcellg,Posxyg,Poszg,Velrhopg,SpsTaug,VelrhopM1g);
+            if(TStep==STEP_Verlet)cusph::PeriodicDuplicateVerlet(count,Np,DomCells,perinc,listpg,Idpg,Codeg,Dcellg,Posxyg,Poszg,Velrhopg,SpsTaug,VelrhopM1g,GradPresg);
             if(TStep==STEP_Symplectic){
               if((PosxyPreg || PoszPreg || VelrhopPreg) && (!PosxyPreg || !PoszPreg || !VelrhopPreg))Run_Exceptioon("Symplectic data is invalid.") ;
-              cusph::PeriodicDuplicateSymplectic(count,Np,DomCells,perinc,listpg,Idpg,Codeg,Dcellg,Posxyg,Poszg,Velrhopg,SpsTaug,PosxyPreg,PoszPreg,VelrhopPreg);
+              cusph::PeriodicDuplicateSymplectic(count,Np,DomCells,perinc,listpg,Idpg,Codeg,Dcellg,Posxyg,Poszg,Velrhopg,SpsTaug,PosxyPreg,PoszPreg,VelrhopPreg,GradPresg);
             }
             if(UseNormals)cusph::PeriodicDuplicateNormals(count,Np,listpg,BoundNormalg,MotionVelg);
 
@@ -357,6 +360,11 @@ void JSphGpuSingle::RunCellDivide(bool updateperiodic){
     swap(Posxyg,posxyg);       ArraysGpu->Free(posxyg);
     swap(Poszg,poszg);         ArraysGpu->Free(poszg);
     swap(Velrhopg,velrhopg);   ArraysGpu->Free(velrhopg);
+  //! DELETE THIS
+    float3*   gradpresg=ArraysGpu->ReserveFloat3();
+    CellDivSingle->SortDataArrays(GradPresg, gradpresg);
+    swap(GradPresg,gradpresg); ArraysGpu->Free(gradpresg);
+  //! DELETE THIS
   }
   if(TStep==STEP_Verlet){
     float4* velrhopg=ArraysGpu->ReserveFloat4();
@@ -458,6 +466,9 @@ void JSphGpuSingle::Interaction_Forces(TpInterStep interstep){
     ,SpsGradvelg
     ,ShiftPosfsg
     ,KgcMatg
+    //! DELETE THIS
+    ,GradPresg
+    //! DELETE THIS
     ,NULL,NULL);
   cusph::Interaction_Forces(parms);
 
@@ -934,6 +945,7 @@ void JSphGpuSingle::SaveData(){
   //-Stores particle data. | Graba datos de particulas.
   JDataArrays arrays;
   AddBasicArrays(arrays,npsave,AuxPos,Idp,AuxVel,AuxRhop);
+  arrays.AddArray("GradPres",npsave,GradPres);
   JSph::SaveData(npsave,arrays,1,vdom,&infoplus);
   if(UseNormals && SvNormals)SaveVtkNormalsGpu("normals/Normals.vtk",Part,npsave,Npb,Posxyg,Poszg,Idpg,BoundNormalg);
   //-Save extra data.

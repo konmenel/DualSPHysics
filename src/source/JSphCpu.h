@@ -48,6 +48,9 @@ typedef struct{
   tsymatrix3f *spsgradvel;
   TpKgc tkgc;
   tsymatrix3f *kgcmat;
+  //! DELETE THIS
+  tfloat3 *gradpres;
+  //! DELETE THIS
 }stinterparmsc;
 
 ///Collects parameters for particle interaction on CPU.
@@ -60,6 +63,9 @@ inline stinterparmsc StInterparmsc(unsigned np,unsigned npb,unsigned npbok
   ,TpShifting shiftmode,tfloat4 *shiftposfs
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
   ,TpKgc tkgc,tsymatrix3f *kgcmat
+  //! DELETE THIS
+  ,tfloat3 *gradpres
+  //! DELETE THIS
 )
 {
   stinterparmsc d={np,npb,npbok,(np-npb)
@@ -71,6 +77,9 @@ inline stinterparmsc StInterparmsc(unsigned np,unsigned npb,unsigned npbok
     ,shiftmode,shiftposfs
     ,spstau,spsgradvel
     ,tkgc,kgcmat
+    //! DELETE THIS
+    ,gradpres
+    //! DELETE THIS
   };
   return(d);
 }
@@ -165,6 +174,9 @@ protected:
 
   //-Variables for Kernel Gradient Correction
   tsymatrix3f *KgcMatc;     ///<The correction matrix "A".
+  //! DELELE THIS
+  tfloat3 *GradPresc;       //<Pressure Gradient for testing.
+  //! DELETE THIS
 
   JDsTimersCpu *Timersc;  ///<Manages timers for CPU execution.
 
@@ -206,6 +218,9 @@ protected:
 
   unsigned GetParticlesData(unsigned n,unsigned pini,bool onlynormal
     ,unsigned *idp,tdouble3 *pos,tfloat3 *vel,float *rhop,typecode *code);
+  //! DELETE THIS
+  void GetParticlesDataGradPres(unsigned n,unsigned pini,tfloat3 *gradpres);
+  //! DELETE THIS
   void ConfigOmp(const JSphCfgRun *cfg);
 
   void ConfigRunMode();
@@ -233,7 +248,7 @@ protected:
     ,const float *press,const tfloat3 *dengradcorr
     ,float &viscdt,float *ar,tfloat3 *ace,float *delta
     ,TpShifting shiftmode,tfloat4 *shiftposfs
-    ,TpKgc tkgc,const tsymatrix3f* kgcmat)const;
+    ,TpKgc tkgc,const tsymatrix3f* kgcmat/*! DELETE THIS */,tfloat3 *gradpres/*! DELETE THIS */)const;
 
   void InteractionForcesDEM(unsigned nfloat,StDivDataCpu divdata,const unsigned *dcell
     ,const unsigned *ftridp,const StDemData* demobjs

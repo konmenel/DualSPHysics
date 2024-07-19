@@ -103,6 +103,9 @@ protected:
   tdouble2 *Posxy;
   double *Posz;
   tfloat4 *Velrhop;
+  //! DELETE THIS
+  tfloat3 *GradPres;
+  //! DELETE THIS
 
   //-Auxiliary variables for the conversion (size=ParticlesSize).
   //-Variables auxiliares para conversion (size=ParticlesSize).
@@ -187,6 +190,9 @@ protected:
 
   //-Variables for Kernel Gradient Correction
   tsymatrix3f *KgcMatg;     ///<The correction matrix "A".
+  //! DELELE THIS
+  float3 *GradPresg;       //<Pressure Gradient for testing.
+  //! DELETE THIS
 
   JDsTimersGpu *Timersg;  ///<Manages timers for GPU execution.
 

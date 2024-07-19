@@ -56,6 +56,9 @@ using namespace std;
 JSphGpu::JSphGpu(bool withmpi):JSph(false,false,withmpi),DivAxis(MGDIV_None){
   ClassName="JSphGpu";
   Idp=NULL; Code=NULL; Dcell=NULL; Posxy=NULL; Posz=NULL; Velrhop=NULL;
+  //! DELETE THIS
+  GradPres=NULL;
+  //! DELETE THIS
   AuxPos=NULL; AuxVel=NULL; AuxRhop=NULL;
   CellDiv=NULL;
   FtoAuxDouble6=NULL; FtoAuxFloat15=NULL; //-Calculates forces on floating bodies.
@@ -144,6 +147,9 @@ void JSphGpu::InitVars(){
   PosxyPreg=NULL; PoszPreg=NULL; VelrhopPreg=NULL; //-Symplectic
   SpsTaug=NULL; SpsGradvelg=NULL;                  //-Laminar+SPS. 
   KgcMatg=NULL;                                    //-Kernel Correction
+  //! DELETE THIS
+  GradPresg=NULL;
+  //! DELETE THIS
   ViscDtg=NULL; 
   Arg=NULL; Aceg=NULL; Deltag=NULL;
   ShiftPosfsg=NULL;                                //-Shifting.
@@ -262,6 +268,9 @@ void JSphGpu::FreeCpuMemoryParticles(){
   delete[] AuxPos;     AuxPos=NULL;
   delete[] AuxVel;     AuxVel=NULL;
   delete[] AuxRhop;    AuxRhop=NULL;
+  //! DELETE THIS
+  delete[] GradPres;   GradPres=NULL;
+  //! DELETE THIS
 }
 
 //==============================================================================
@@ -283,6 +292,9 @@ void JSphGpu::AllocCpuMemoryParticles(unsigned np){
       AuxPos=new tdouble3[np];   MemCpuParticles+=sizeof(tdouble3)*np; 
       AuxVel=new tfloat3[np];    MemCpuParticles+=sizeof(tfloat3)*np;
       AuxRhop=new float[np];     MemCpuParticles+=sizeof(float)*np;
+      //! DELETE THIS
+      GradPres=new tfloat3[np];  MemCpuParticles+=sizeof(tfloat3)*np;
+      //! DELETE THIS
     }
     catch(const std::bad_alloc){
       Run_Exceptioon(fun::PrintStr("Could not allocate the requested memory (np=%u).",np));
@@ -350,6 +362,9 @@ void JSphGpu::AllocGpuMemoryParticles(unsigned np,float over){
     //ArraysGpu->AddArrayCount(JArraysGpu::SIZE_4B,1);  //-InOutPartg
     ArraysGpu->AddArrayCount(JArraysGpu::SIZE_1B,2);  //-newizone,zsurfok
   }
+  //! DELETE THIS
+  ArraysGpu->AddArrayCount(JArraysGpu::SIZE_12B,1);   //-GradPres
+  //! DELETE THIS
 
   //-Shows the allocated memory.
   MemGpuParticles=ArraysGpu->GetAllocMemoryGpu();
@@ -377,6 +392,10 @@ void JSphGpu::ResizeGpuMemoryParticles(unsigned npnew){
   tsymatrix3f *spstau     =SaveArrayGpu(Np,SpsTaug);
   float3      *boundnormal=SaveArrayGpu(Np,BoundNormalg);
   float3      *motionvel  =SaveArrayGpu(Np,MotionVelg);
+  //! DELETE THIS
+  float3      *gradpres   =SaveArrayGpu(Np,GradPresg);
+  //! DELETE THIS
+
   //-Frees pointers.
   ArraysGpu->Free(Idpg);
   ArraysGpu->Free(Codeg);
@@ -392,6 +411,9 @@ void JSphGpu::ResizeGpuMemoryParticles(unsigned npnew){
   ArraysGpu->Free(SpsTaug);
   ArraysGpu->Free(BoundNormalg);
   ArraysGpu->Free(MotionVelg);
+  //! DELETE THIS
+  ArraysGpu->Free(GradPresg);
+  //! DELETE THIS
   //-Resizes GPU memory allocation.
   const double mbparticle=(double(MemGpuParticles)/(1024*1024))/GpuParticlesSize; //-MB por particula.
   Log->Printf("**JSphGpu: Requesting gpu memory for %u particles: %.1f MB.",npnew,mbparticle*npnew);
@@ -404,6 +426,9 @@ void JSphGpu::ResizeGpuMemoryParticles(unsigned npnew){
   Poszg   =ArraysGpu->ReserveDouble();
   PosCellg=ArraysGpu->ReserveFloat4();
   Velrhopg=ArraysGpu->ReserveFloat4();
+  //! DELETE THIS
+  GradPresg=ArraysGpu->ReserveFloat3();
+  //! DELETE THIS
   if(velrhopm1)  VelrhopM1g  =ArraysGpu->ReserveFloat4();
   if(posxypre)   PosxyPreg   =ArraysGpu->ReserveDouble2();
   if(poszpre)    PoszPreg    =ArraysGpu->ReserveDouble();
@@ -426,6 +451,9 @@ void JSphGpu::ResizeGpuMemoryParticles(unsigned npnew){
   RestoreArrayGpu(Np,spstau,SpsTaug);
   RestoreArrayGpu(Np,boundnormal,BoundNormalg);
   RestoreArrayGpu(Np,motionvel,MotionVelg);
+  //! DELETE THIS
+  RestoreArrayGpu(Np,gradpres,GradPresg);
+  //! DELETE THIS
   //-Updates values.
   GpuParticlesAllocs++;
   GpuParticlesSize=npnew;
@@ -469,6 +497,9 @@ void JSphGpu::ReserveBasicArraysGpu(){
   Poszg=ArraysGpu->ReserveDouble();
   PosCellg=ArraysGpu->ReserveFloat4();
   Velrhopg=ArraysGpu->ReserveFloat4();
+  //! DELETE THIS
+  GradPresg=ArraysGpu->ReserveFloat3();
+  //! DELETE THIS
   if(TStep==STEP_Verlet)VelrhopM1g=ArraysGpu->ReserveFloat4();
   if(TVisco==VISCO_LaminarSPS)SpsTaug=ArraysGpu->ReserveSymatrix3f();
   if(UseNormals){
@@ -571,6 +602,9 @@ void JSphGpu::ParticlesDataUp(unsigned n,const tfloat3 *boundnormal){
   cudaMemcpy(Posxyg  ,Posxy  ,sizeof(double2)*n ,cudaMemcpyHostToDevice);
   cudaMemcpy(Poszg   ,Posz   ,sizeof(double)*n  ,cudaMemcpyHostToDevice);
   cudaMemcpy(Velrhopg,Velrhop,sizeof(float4)*n  ,cudaMemcpyHostToDevice);
+  //! DELETE THIS
+  cudaMemcpy(GradPresg,GradPres,sizeof(float3)*n  ,cudaMemcpyHostToDevice);
+  //! DELETE THIS
   if(UseNormals)cudaMemcpy(BoundNormalg,boundnormal,sizeof(float3)*n,cudaMemcpyHostToDevice);
   Check_CudaErroor("Failed copying data to GPU.");
 }
@@ -592,6 +626,9 @@ unsigned JSphGpu::ParticlesDataDown(unsigned n,unsigned pini,bool code,bool only
   cudaMemcpy(Posxy  ,Posxyg  +pini,sizeof(double2) *n,cudaMemcpyDeviceToHost);
   cudaMemcpy(Posz   ,Poszg   +pini,sizeof(double)  *n,cudaMemcpyDeviceToHost);
   cudaMemcpy(Velrhop,Velrhopg+pini,sizeof(float4)  *n,cudaMemcpyDeviceToHost);
+  //! DELETE THIS
+  cudaMemcpy(GradPres,GradPresg+pini,sizeof(float3)*n,cudaMemcpyDeviceToHost);
+  //! DELETE THIS
   if(code || onlynormal)cudaMemcpy(Code,Codeg+pini,sizeof(typecode)*n,cudaMemcpyDeviceToHost);
   Check_CudaErroor("Failed copying data from GPU.");
   //-Eliminates abnormal particles (periodic and others). | Elimina particulas no normales (periodicas y otras).
@@ -605,6 +642,9 @@ unsigned JSphGpu::ParticlesDataDown(unsigned n,unsigned pini,bool code,bool only
         Posz[p-ndel]   =Posz[p];
         Velrhop[p-ndel]=Velrhop[p];
         Code[p-ndel]   =Code[p];
+        //! DELETE THIS
+        GradPres[p-ndel]=GradPres[p];
+        //! DELETE THIS
       }
       if(!normal)ndel++;
     }
@@ -661,6 +701,9 @@ void JSphGpu::ConfigBlockSizes(bool usezone,bool useperi){
         ,NULL
         ,NULL
         ,NULL
+        //! DELETE THIS
+        ,NULL
+        //! DELETE THIS
         ,NULL,&kerinfo);
       cusph::Interaction_Forces(parms);
       if(UseDEM)cusph::Interaction_ForcesDem(BlockSizes.forcesdem,CaseNfloat,divdatag,NULL,NULL,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,NULL,&kerinfo);
@@ -824,7 +867,10 @@ void JSphGpu::PreInteractionVars_Forces(unsigned np,unsigned npb){
   cudaMemset(Aceg,0,sizeof(tfloat3)*np);                                 //Aceg[]=(0,0,0)
   if(SpsGradvelg)cudaMemset(SpsGradvelg+npb,0,sizeof(tsymatrix3f)*npf);  //SpsGradvelg[]=(0,0,0,0,0,0).
   if(KgcMatg)cudaMemset(KgcMatg+npb,0,sizeof(tsymatrix3f)*npf);          //KgcMatc[]=(0,0,0,0,0,0).
-
+  //! DETELE THIS
+  cudaMemset(GradPresg+npb,0,sizeof(tfloat3)*npf);
+  //! DETELE THIS
+  
   //-Select particles for shifting.
   if(ShiftPosfsg)Shifting->InitGpu(npf,npb,Posxyg,Poszg,ShiftPosfsg);
 

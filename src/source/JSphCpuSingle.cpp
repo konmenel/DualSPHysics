@@ -119,6 +119,10 @@ void JSphCpuSingle::ConfigDomain(){
   memcpy(Posc,PartsLoaded->GetPos(),sizeof(tdouble3)*Np);
   memcpy(Idpc,PartsLoaded->GetIdp(),sizeof(unsigned)*Np);
   memcpy(Velrhopc,PartsLoaded->GetVelRhop(),sizeof(tfloat4)*Np);
+  //! DELETE THIS
+  GradPresc=ArraysCpu->ReserveFloat3();
+  memset(GradPresc,0,sizeof(tfloat3)*Np);
+  //! DELETE THIS
 
   //-Computes radius of floating bodies.
   if(CaseNfloat && PeriActive!=0 && !PartBegin)CalcFloatingRadius(Np,Posc,Idpc);
@@ -267,7 +271,7 @@ void JSphCpuSingle::PeriodicDuplicatePos(unsigned pnew,unsigned pcopy,bool inver
 //==============================================================================
 void JSphCpuSingle::PeriodicDuplicateVerlet(unsigned np,unsigned pini,tuint3 cellmax
   ,tdouble3 perinc,const unsigned *listp,unsigned *idp,typecode *code,unsigned *dcell
-  ,tdouble3 *pos,tfloat4 *velrhop,tsymatrix3f *spstau,tfloat4 *velrhopm1)const
+  ,tdouble3 *pos,tfloat4 *velrhop,tsymatrix3f *spstau,tfloat4 *velrhopm1,/*! DELETE THIS*/tfloat3 *gradpres/* !DELETE THIS */)const
 {
   const int n=int(np);
   #ifdef OMP_USE
@@ -284,6 +288,9 @@ void JSphCpuSingle::PeriodicDuplicateVerlet(unsigned np,unsigned pini,tuint3 cel
     code[pnew]=CODE_SetPeriodic(code[pcopy]);
     velrhop[pnew]=velrhop[pcopy];
     velrhopm1[pnew]=velrhopm1[pcopy];
+    //! DELETE THIS
+    gradpres[pnew]=gradpres[pcopy];
+    //! DELETE THIS
     if(spstau)spstau[pnew]=spstau[pcopy];
   }
 }
@@ -298,7 +305,8 @@ void JSphCpuSingle::PeriodicDuplicateVerlet(unsigned np,unsigned pini,tuint3 cel
 /// Este kernel vale para single-cpu y multi-cpu porque usa domposmin. 
 //==============================================================================
 void JSphCpuSingle::PeriodicDuplicateSymplectic(unsigned np,unsigned pini,tuint3 cellmax,tdouble3 perinc,const unsigned *listp
-  ,unsigned *idp,typecode *code,unsigned *dcell,tdouble3 *pos,tfloat4 *velrhop,tsymatrix3f *spstau,tdouble3 *pospre,tfloat4 *velrhoppre)const
+  ,unsigned *idp,typecode *code,unsigned *dcell,tdouble3 *pos,tfloat4 *velrhop,tsymatrix3f *spstau,tdouble3 *pospre,tfloat4 *velrhoppre
+  ,/*! DELETE THIS*/tfloat3 *gradpres/* !DELETE THIS */)const
 {
   const int n=int(np);
   #ifdef OMP_USE
@@ -314,6 +322,9 @@ void JSphCpuSingle::PeriodicDuplicateSymplectic(unsigned np,unsigned pini,tuint3
     idp[pnew]=idp[pcopy];
     code[pnew]=CODE_SetPeriodic(code[pcopy]);
     velrhop[pnew]=velrhop[pcopy];
+    //! DELETE THIS
+    gradpres[pnew]=gradpres[pcopy];
+    //! DELETE THIS
     if(pospre)pospre[pnew]=pospre[pcopy];
     if(velrhoppre)velrhoppre[pnew]=velrhoppre[pcopy];
     if(spstau)spstau[pnew]=spstau[pcopy];
@@ -409,10 +420,10 @@ void JSphCpuSingle::RunPeriodic(){
             run=false;
             //-Create new duplicate periodic particles in the list
             //-Crea nuevas particulas periodicas duplicando las particulas de la lista.
-            if(TStep==STEP_Verlet)PeriodicDuplicateVerlet(count,Np,DomCells,perinc,listp,Idpc,Codec,Dcellc,Posc,Velrhopc,SpsTauc,VelrhopM1c);
+            if(TStep==STEP_Verlet)PeriodicDuplicateVerlet(count,Np,DomCells,perinc,listp,Idpc,Codec,Dcellc,Posc,Velrhopc,SpsTauc,VelrhopM1c/*! DELETE THIS*/,GradPresc/*! DELETE THIS*/);
             if(TStep==STEP_Symplectic){
               if((PosPrec || VelrhopPrec) && (!PosPrec || !VelrhopPrec))Run_Exceptioon("Symplectic data is invalid.") ;
-              PeriodicDuplicateSymplectic(count,Np,DomCells,perinc,listp,Idpc,Codec,Dcellc,Posc,Velrhopc,SpsTauc,PosPrec,VelrhopPrec);
+              PeriodicDuplicateSymplectic(count,Np,DomCells,perinc,listp,Idpc,Codec,Dcellc,Posc,Velrhopc,SpsTauc,PosPrec,VelrhopPrec/*! DELETE THIS*/,GradPresc/*! DELETE THIS*/);
             }
             if(UseNormals)PeriodicDuplicateNormals(count,Np,DomCells,perinc,listp,BoundNormalc,MotionVelc);
 
@@ -452,6 +463,9 @@ void JSphCpuSingle::RunCellDivide(bool updateperiodic){
   CellDivSingle->SortArray(Dcellc);
   CellDivSingle->SortArray(Posc);
   CellDivSingle->SortArray(Velrhopc);
+  //! DELETE THIS
+  CellDivSingle->SortArray(GradPresc);
+  //! DELETE THIS
   if(TStep==STEP_Verlet){
     CellDivSingle->SortArray(VelrhopM1c);
   }
@@ -536,6 +550,9 @@ void JSphCpuSingle::Interaction_Forces(TpInterStep interstep){
     ,ShiftingMode,ShiftPosfsc
     ,SpsTauc,SpsGradvelc
     ,TKgc,KgcMatc
+    //! DELETE THIS
+    ,GradPresc
+    //! DELETE THIS
   );
   StInterResultc res;
   res.viscdt=0;
@@ -1139,6 +1156,9 @@ void JSphCpuSingle::SaveData(){
   tdouble3 *pos=NULL;
   tfloat3 *vel=NULL;
   float *rhop=NULL;
+  //! DELETE THIS
+  tfloat3 *gradpres=NULL;
+  //! DELETE THIS
   if(save){
     //-Assign memory and collect particle values. | Asigna memoria y recupera datos de las particulas.
     idp=ArraysCpu->ReserveUint();
@@ -1146,6 +1166,10 @@ void JSphCpuSingle::SaveData(){
     vel=ArraysCpu->ReserveFloat3();
     rhop=ArraysCpu->ReserveFloat();
     unsigned npnormal=GetParticlesData(Np,0,PeriActive!=0,idp,pos,vel,rhop,NULL);
+    //! DELETE THIS
+    gradpres=ArraysCpu->ReserveFloat3();
+    GetParticlesDataGradPres(Np,0,gradpres);
+    //! DELETE THIS
     if(npnormal!=npsave)Run_Exceptioon("The number of particles is invalid.");
   }
   //-Gather additional information. | Reune informacion adicional.
@@ -1169,12 +1193,18 @@ void JSphCpuSingle::SaveData(){
   //-Stores particle data. | Graba datos de particulas.
   JDataArrays arrays;
   AddBasicArrays(arrays,npsave,pos,idp,vel,rhop);
+  //! DELETE THIS
+  arrays.AddArray("GradPres",npsave,gradpres);
+  //! DELETE THIS
   JSph::SaveData(npsave,arrays,1,vdom,&infoplus);
   //-Free auxiliary memory for particle data. | Libera memoria auxiliar para datos de particulas.
   ArraysCpu->Free(idp);
   ArraysCpu->Free(pos);
   ArraysCpu->Free(vel);
   ArraysCpu->Free(rhop);
+  //! DELETE THIS
+  ArraysCpu->Free(gradpres);
+  //! DELETE THIS
   if(UseNormals && SvNormals)SaveVtkNormals("normals/Normals.vtk",Part,npsave,Npb,Posc,Idpc,BoundNormalc,1.f);
   //-Save extra data.
   if(SvExtraDataBi4)SaveExtraData();

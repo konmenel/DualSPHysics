@@ -520,7 +520,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
   ,float2 &grap1_xx_xy,float2 &grap1_xz_yy,float2 &grap1_yz_zz
   ,float3 &acep1,float &arp1,float &visc,float &deltap1
   ,TpShifting shiftmode,float4 &shiftposfsp1
-  ,TpKgc tkgc,const tsymatrix3f *kgcmat,float kgcthreshold,bool sim2d)
+  ,TpKgc tkgc,const tsymatrix3f *kgcmat,float kgcthreshold/*! DELETE THIS */,float3 *gradpres/*! DELETE THIS */,bool sim2d)
 {
   //-Kernel Gradient Correction (KGC)
   tsymatrix3f bmat{1,0,0,1,0,1}; //< Unit Matrix (I)
@@ -694,6 +694,21 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
           }
         }
       }
+      //! DELETE THIS
+      const float pressp2=cufsph::ComputePressCte(velrhop2.w);
+      const float prs=(pressp1+pressp2)/velrhop2.w;
+      const float p_vpm=prs*massp2;
+      float frxbar_=frx;
+      float frybar_=fry;
+      float frzbar_=frz;
+      if(kgc){
+        const tsymatrix3f b=cumath::InverseMatrix3x3(kgcmat[p1],detp1);
+        frxbar_=frx*bmat.xx+fry*bmat.xy+frz*bmat.xz;
+        frybar_=frx*bmat.xy+fry*bmat.yy+frz*bmat.yz;
+        frzbar_=frx*bmat.xz+fry*bmat.yz+frz*bmat.zz;
+      }
+      gradpres[p1].x+=p_vpm*frxbar_; gradpres[p1].y+=p_vpm*frybar_; gradpres[p1].z+=p_vpm*frzbar_;
+      //! DELETE THIS
     }
   }
 }
@@ -712,7 +727,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
   ,const float4 *poscell,const float4 *velrhop,const typecode *code,const unsigned *idp
   ,float *viscdt,float *ar,float3 *ace,float *delta
   ,TpShifting shiftmode,float4 *shiftposfs
-  ,TpKgc tkgc,const tsymatrix3f *kgcmat,float kgcthreshold,bool sim2d)
+  ,TpKgc tkgc,const tsymatrix3f *kgcmat,float kgcthreshold/*! DELETE THIS */,float3 *gradpres/*! DELETE THIS */,bool sim2d)
 {
   const unsigned p=blockIdx.x*blockDim.x + threadIdx.x; //-Number of particle.
   if(p<n){
@@ -765,10 +780,10 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
       if(pfin){
                           KerInteractionForcesFluidBox<tker,ftmode,lamsps,tdensity,shift,false,kgc> (false,p1,pini,pfin,viscof,ftomassp,tauff,dengradcorr
                           ,poscell,velrhop,code,idp,CTE.massf,ftp1,pscellp1,velrhop1,pressp1,taup1_xx_xy,taup1_xz_yy,taup1_yz_zz,grap1_xx_xy,grap1_xz_yy,grap1_yz_zz
-                          ,acep1,arp1,visc,deltap1,shiftmode,shiftposfsp1,tkgc,kgcmat,kgcthreshold,sim2d);
+                          ,acep1,arp1,visc,deltap1,shiftmode,shiftposfsp1,tkgc,kgcmat,kgcthreshold/*! DELETE THIS*/,gradpres/*! DELETE THIS*/,sim2d);
         if(symm && rsymp1)KerInteractionForcesFluidBox<tker,ftmode,lamsps,tdensity,shift,true ,kgc> (false,p1,pini,pfin,viscof,ftomassp,tauff,dengradcorr
                           ,poscell,velrhop,code,idp,CTE.massf,ftp1,pscellp1,velrhop1,pressp1,taup1_xx_xy,taup1_xz_yy,taup1_yz_zz,grap1_xx_xy,grap1_xz_yy,grap1_yz_zz
-                          ,acep1,arp1,visc,deltap1,shiftmode,shiftposfsp1,tkgc,kgcmat,kgcthreshold,sim2d); //<vs_syymmetry>
+                          ,acep1,arp1,visc,deltap1,shiftmode,shiftposfsp1,tkgc,kgcmat,kgcthreshold/*! DELETE THIS*/,gradpres/*! DELETE THIS*/,sim2d); //<vs_syymmetry>
       }
     }
     //-Interaction with boundaries.
@@ -778,10 +793,10 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
       if(pfin){
                         KerInteractionForcesFluidBox<tker,ftmode,lamsps,tdensity,shift,false,kgc> (true ,p1,pini,pfin,viscob,ftomassp,tauff,NULL,poscell,velrhop,code,idp
                         ,CTE.massb,ftp1,pscellp1,velrhop1,pressp1,taup1_xx_xy,taup1_xz_yy,taup1_yz_zz,grap1_xx_xy,grap1_xz_yy,grap1_yz_zz,acep1,arp1,visc,deltap1
-                        ,shiftmode,shiftposfsp1,tkgc,kgcmat,kgcthreshold,sim2d);
+                        ,shiftmode,shiftposfsp1,tkgc,kgcmat,kgcthreshold/*! DELETE THIS*/,gradpres/*! DELETE THIS*/,sim2d);
       if(symm && rsymp1)KerInteractionForcesFluidBox<tker,ftmode,lamsps,tdensity,shift,true ,kgc> (true ,p1,pini,pfin,viscob,ftomassp,tauff,NULL,poscell,velrhop,code,idp
                         ,CTE.massb,ftp1,pscellp1,velrhop1,pressp1,taup1_xx_xy,taup1_xz_yy,taup1_yz_zz,grap1_xx_xy,grap1_xz_yy,grap1_yz_zz,acep1,arp1,visc,deltap1
-                        ,shiftmode,shiftposfsp1,tkgc,kgcmat,kgcthreshold,sim2d);
+                        ,shiftmode,shiftposfsp1,tkgc,kgcmat,kgcthreshold/*! DELETE THIS*/,gradpres/*! DELETE THIS*/,sim2d);
       }
     }
 
@@ -863,7 +878,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
 {
  #if CUDART_VERSION >= 6050
   {
-    typedef void (*fun_ptr)(unsigned,unsigned,float,float,int,int4,int3,const int2*,unsigned,const unsigned*,const float*,const float2*,float2*,const float3*,const float4*,const float4*,const typecode*,const unsigned*,float*,float*,float3*,float*,TpShifting,float4*,TpKgc,const tsymatrix3f*,float,bool);
+    typedef void (*fun_ptr)(unsigned,unsigned,float,float,int,int4,int3,const int2*,unsigned,const unsigned*,const float*,const float2*,float2*,const float3*,const float4*,const float4*,const typecode*,const unsigned*,float*,float*,float3*,float*,TpShifting,float4*,TpKgc,const tsymatrix3f*,float,/* ! DELETE THIS */float3* /* ! DELETE THIS */,bool);
     fun_ptr ptr=&KerInteractionForcesFluid<tker,ftmode,lamsps,tdensity,shift,symm,kgc>;
     int qblocksize=0,mingridsize=0;
     cudaOccupancyMaxPotentialBlockSize(&mingridsize,&qblocksize,(void*)ptr,0,0);
@@ -919,12 +934,12 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
       KerInteractionForcesFluid<tker,ftmode,lamsps,tdensity,shift,true,kgc> <<<sgridf,t.bsfluid,0,t.stm>>> 
       (t.fluidnum,t.fluidini,t.viscob,t.viscof,dvd.scelldiv,dvd.nc,dvd.cellzero,dvd.beginendcell,dvd.cellfluid,t.dcell
       ,t.ftomassp,(const float2*)t.tau,(float2*)t.gradvel,t.dengradcorr,t.poscell,t.velrhop,t.code,t.idp
-      ,t.viscdt,t.ar,t.ace,t.delta,t.shiftmode,t.shiftposfs,t.tkgc,t.kgcmat,t.kgcthreshold,t.simulate2d);
+      ,t.viscdt,t.ar,t.ace,t.delta,t.shiftmode,t.shiftposfs,t.tkgc,t.kgcmat,t.kgcthreshold/*! DELETE THIS*/,t.gradpres/*! DELETE THIS*/,t.simulate2d);
     }else{ //<vs_syymmetry_end>
       KerInteractionForcesFluid<tker,ftmode,lamsps,tdensity,shift,false,kgc> <<<sgridf,t.bsfluid,0,t.stm>>> 
       (t.fluidnum,t.fluidini,t.viscob,t.viscof,dvd.scelldiv,dvd.nc,dvd.cellzero,dvd.beginendcell,dvd.cellfluid,t.dcell
       ,t.ftomassp,(const float2*)t.tau,(float2*)t.gradvel,t.dengradcorr,t.poscell,t.velrhop,t.code,t.idp
-      ,t.viscdt,t.ar,t.ace,t.delta,t.shiftmode,t.shiftposfs,t.tkgc,t.kgcmat,t.kgcthreshold,t.simulate2d);
+      ,t.viscdt,t.ar,t.ace,t.delta,t.shiftmode,t.shiftposfs,t.tkgc,t.kgcmat,t.kgcthreshold/*! DELETE THIS*/,t.gradpres/*! DELETE THIS*/,t.simulate2d);
       //KerInteractionForcesFluid<tker,ftmode,lamsps,tdensity,shift,false> <<<sgridf,t.bsfluid,0,t.stm>>> (t.fluidnum,t.fluidini,t.scelldiv,t.nc,t.cellfluid,t.viscob,t.viscof,t.begincell,Int3(t.cellmin),t.dcell,t.ftomassp,(const float2*)t.tau,(float2*)t.gradvel,t.poscell,t.velrhop,t.code,t.idp,t.viscdt,t.ar,t.ace,t.delta,t.shiftmode,t.shiftposfs);
     }
   }
@@ -2718,7 +2733,8 @@ __device__ void KerPeriodicDuplicatePos(unsigned pnew,unsigned pcopy
 //------------------------------------------------------------------------------
 __global__ void KerPeriodicDuplicateVerlet(unsigned n,unsigned pini,uint3 cellmax,double3 perinc
   ,const unsigned *listp,unsigned *idp,typecode *code,unsigned *dcell
-  ,double2 *posxy,double *posz,float4 *velrhop,tsymatrix3f *spstau,float4 *velrhopm1)
+  ,double2 *posxy,double *posz,float4 *velrhop,tsymatrix3f *spstau,float4 *velrhopm1
+  ,/*! DELETE THIS*/float3 *gradpres/* !DELETE THIS */)
 {
   const unsigned p=blockIdx.x*blockDim.x + threadIdx.x; //-Number of particle.
   if(p<n){
@@ -2734,6 +2750,9 @@ __global__ void KerPeriodicDuplicateVerlet(unsigned n,unsigned pini,uint3 cellma
     code[pnew]=CODE_SetPeriodic(code[pcopy]);
     velrhop[pnew]=velrhop[pcopy];
     velrhopm1[pnew]=velrhopm1[pcopy];
+    //! DELETE THIS
+    gradpres[pnew]=gradpres[pcopy];
+    //! DELETE THIS
     if(spstau)spstau[pnew]=spstau[pcopy];
   }
 }
@@ -2744,12 +2763,13 @@ __global__ void KerPeriodicDuplicateVerlet(unsigned n,unsigned pini,uint3 cellma
 //==============================================================================
 void PeriodicDuplicateVerlet(unsigned n,unsigned pini,tuint3 domcells,tdouble3 perinc
   ,const unsigned *listp,unsigned *idp,typecode *code,unsigned *dcell
-  ,double2 *posxy,double *posz,float4 *velrhop,tsymatrix3f *spstau,float4 *velrhopm1)
+  ,double2 *posxy,double *posz,float4 *velrhop,tsymatrix3f *spstau,float4 *velrhopm1
+  ,/*! DELETE THIS*/float3 *gradpres/* !DELETE THIS */)
 {
   if(n){
     uint3 cellmax=make_uint3(domcells.x-1,domcells.y-1,domcells.z-1);
     dim3 sgrid=GetSimpleGridSize(n,SPHBSIZE);
-    KerPeriodicDuplicateVerlet <<<sgrid,SPHBSIZE>>> (n,pini,cellmax,Double3(perinc),listp,idp,code,dcell,posxy,posz,velrhop,spstau,velrhopm1);
+    KerPeriodicDuplicateVerlet <<<sgrid,SPHBSIZE>>> (n,pini,cellmax,Double3(perinc),listp,idp,code,dcell,posxy,posz,velrhop,spstau,velrhopm1,/*! DELETE THIS*/gradpres/* !DELETE THIS */);
   }
 }
 
@@ -2764,7 +2784,8 @@ void PeriodicDuplicateVerlet(unsigned n,unsigned pini,tuint3 domcells,tdouble3 p
 //------------------------------------------------------------------------------
 template<bool varspre> __global__ void KerPeriodicDuplicateSymplectic(unsigned n,unsigned pini
   ,uint3 cellmax,double3 perinc,const unsigned *listp,unsigned *idp,typecode *code,unsigned *dcell
-  ,double2 *posxy,double *posz,float4 *velrhop,tsymatrix3f *spstau,double2 *posxypre,double *poszpre,float4 *velrhoppre)
+  ,double2 *posxy,double *posz,float4 *velrhop,tsymatrix3f *spstau,double2 *posxypre,double *poszpre,float4 *velrhoppre
+  ,/*! DELETE THIS*/float3 *gradpres/* !DELETE THIS */)
 {
   const unsigned p=blockIdx.x*blockDim.x + threadIdx.x; //-Number of particle.
   if(p<n){
@@ -2779,6 +2800,9 @@ template<bool varspre> __global__ void KerPeriodicDuplicateSymplectic(unsigned n
     idp[pnew]=idp[pcopy];
     code[pnew]=CODE_SetPeriodic(code[pcopy]);
     velrhop[pnew]=velrhop[pcopy];
+    //! DELETE THIS
+    gradpres[pnew]=gradpres[pcopy];
+    //! DELETE THIS
     if(varspre){
       posxypre[pnew]=posxypre[pcopy];
       poszpre[pnew]=poszpre[pcopy];
@@ -2794,13 +2818,14 @@ template<bool varspre> __global__ void KerPeriodicDuplicateSymplectic(unsigned n
 //==============================================================================
 void PeriodicDuplicateSymplectic(unsigned n,unsigned pini
   ,tuint3 domcells,tdouble3 perinc,const unsigned *listp,unsigned *idp,typecode *code,unsigned *dcell
-  ,double2 *posxy,double *posz,float4 *velrhop,tsymatrix3f *spstau,double2 *posxypre,double *poszpre,float4 *velrhoppre)
+  ,double2 *posxy,double *posz,float4 *velrhop,tsymatrix3f *spstau,double2 *posxypre,double *poszpre,float4 *velrhoppre
+  ,/*! DELETE THIS*/float3 *gradpres/* !DELETE THIS */)
 {
   if(n){
     uint3 cellmax=make_uint3(domcells.x-1,domcells.y-1,domcells.z-1);
     dim3 sgrid=GetSimpleGridSize(n,SPHBSIZE);
-    if(posxypre!=NULL)KerPeriodicDuplicateSymplectic<true>  <<<sgrid,SPHBSIZE>>> (n,pini,cellmax,Double3(perinc),listp,idp,code,dcell,posxy,posz,velrhop,spstau,posxypre,poszpre,velrhoppre);
-    else              KerPeriodicDuplicateSymplectic<false> <<<sgrid,SPHBSIZE>>> (n,pini,cellmax,Double3(perinc),listp,idp,code,dcell,posxy,posz,velrhop,spstau,posxypre,poszpre,velrhoppre);
+    if(posxypre!=NULL)KerPeriodicDuplicateSymplectic<true>  <<<sgrid,SPHBSIZE>>> (n,pini,cellmax,Double3(perinc),listp,idp,code,dcell,posxy,posz,velrhop,spstau,posxypre,poszpre,velrhoppre,/*! DELETE THIS*/gradpres/* !DELETE THIS */);
+    else              KerPeriodicDuplicateSymplectic<false> <<<sgrid,SPHBSIZE>>> (n,pini,cellmax,Double3(perinc),listp,idp,code,dcell,posxy,posz,velrhop,spstau,posxypre,poszpre,velrhoppre,/*! DELETE THIS*/gradpres/* !DELETE THIS */);
   }
 }
 

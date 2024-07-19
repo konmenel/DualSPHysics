@@ -128,6 +128,9 @@ typedef struct StrInterParmsg{
   tsymatrix3f *gradvel;
   float4 *shiftposfs;
   tsymatrix3f *kgcmat;
+  //! DELETE THIS
+  float3 *gradpres;
+  //! DELETE THIS
   //-Other values and objects.
   cudaStream_t stm;
   StKerInfo *kerinfo;
@@ -152,6 +155,9 @@ typedef struct StrInterParmsg{
     ,tsymatrix3f *spsgradvel_
     ,float4 *shiftposfs_
     ,tsymatrix3f *kgcmat_
+    //! DELETE THIS
+    ,float3 *gradpres_
+    //! DELETE THIS
     ,cudaStream_t stm_
     ,StKerInfo *kerinfo_)
   {
@@ -180,6 +186,7 @@ typedef struct StrInterParmsg{
     gradvel=spsgradvel_;
     shiftposfs=shiftposfs_;
     kgcmat=kgcmat_;
+    gradpres=gradpres_;
     //-Other values and objects.
     stm=stm_;
     kerinfo=kerinfo_;
@@ -276,10 +283,12 @@ void PeriodicIgnore(unsigned n,typecode *code);
 unsigned PeriodicMakeList(unsigned n,unsigned pini,bool stable,unsigned nmax,tdouble3 mapposmin,tdouble3 mapposmax,tdouble3 perinc,const double2 *posxy,const double *posz,const typecode *code,unsigned *listp);
 void PeriodicDuplicateVerlet(unsigned n,unsigned pini,tuint3 domcells,tdouble3 perinc
   ,const unsigned *listp,unsigned *idp,typecode *code,unsigned *dcell
-  ,double2 *posxy,double *posz,float4 *velrhop,tsymatrix3f *spstau,float4 *velrhopm1);
+  ,double2 *posxy,double *posz,float4 *velrhop,tsymatrix3f *spstau,float4 *velrhopm1
+  ,/*! DELETE THIS*/float3 *gradpres/* !DELETE THIS */);
 void PeriodicDuplicateSymplectic(unsigned n,unsigned pini
   ,tuint3 domcells,tdouble3 perinc,const unsigned *listp,unsigned *idp,typecode *code,unsigned *dcell
-  ,double2 *posxy,double *posz,float4 *velrhop,tsymatrix3f *spstau,double2 *posxypre,double *poszpre,float4 *velrhoppre);
+  ,double2 *posxy,double *posz,float4 *velrhop,tsymatrix3f *spstau,double2 *posxypre,double *poszpre,float4 *velrhoppre
+  ,/*! DELETE THIS*/float3 *gradpres/* !DELETE THIS */);
 void PeriodicDuplicateNormals(unsigned n,unsigned pini,const unsigned *listp,float3 *normals,float3 *motionvel);
 
 //-Kernels for Damping.

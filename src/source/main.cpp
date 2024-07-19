@@ -151,6 +151,7 @@ int main(int argc, char** argv){
   //AppInfo.AddNameExtra("Symmetry");    //<vs_syymmetry>
   //AppInfo.AddNameExtra("SaveFtAce");
   //AppInfo.AddNameExtra("SaveFtMotion");//<vs_ftmottionsv>
+  AppInfo.AddNameExtra("KGC");
   #ifdef CODE_SIZE4
     AppInfo.AddNameExtra("MK65k");
   #endif

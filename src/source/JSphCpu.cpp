@@ -660,7 +660,7 @@ template<TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionForcesBound
 }
 
 //! DELETE THIS
-#define PrintTSymatrixf(mat) printf("%s:\n%.4f,%.4f,%.4f\n%.4f,%.4f,%.4f\n,%.4f,%.4f,%.4f\n", #mat,(mat).xx,(mat).xy,(mat).xz,(mat).xy,(mat).yy,(mat).yz,(mat).xz,(mat).yz,(mat).zz)
+#define PrintTSymatrixf(mat) printf("%s:\n%.4f,%.4f,%.4f\n%.4f,%.4f,%.4f\n%.4f,%.4f,%.4f\n", #mat,(mat).xx,(mat).xy,(mat).xz,(mat).xy,(mat).yy,(mat).yz,(mat).xz,(mat).yz,(mat).zz)
 //! DELETE THIS
 
 //==============================================================================
@@ -811,18 +811,28 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
             acep1.x+=p_vpm*frxbar; acep1.y+=p_vpm*frybar; acep1.z+=p_vpm*frzbar;
           }
           //! DELETE THIS
-          if(CODE_IsFluid(code[p1])){
-            const float prs=(pressp1+press[p2])/velrhop2.w;
-            const float p_vpm=prs*massp2;
+          if(CODE_IsFluid(code[p1]) && !boundp2){
+            const float prs=press[p2]-pressp1;
+            const float p_vpm=prs*massp2/velrhop2.w;
+            // const float p_vpm=1.0f*massp2/velrhop2.w; // Gradient of 1
             float frxbar_=frx;
             float frybar_=fry;
             float frzbar_=frz;
             if(kgc){
-              const tsymatrix3f b=fmath::InverseMatrix3x3(kgcmat[p1],detp1);
-              frxbar_=frx*bmat.xx+fry*bmat.xy+frz*bmat.xz;
-              frybar_=frx*bmat.xy+fry*bmat.yy+frz*bmat.yz;
-              frzbar_=frx*bmat.xz+fry*bmat.yz+frz*bmat.zz;
+              tsymatrix3f b{1,0,0,1,0,1}; //< Unit Matrix (I)
+              if(Simulate2D){
+                const tsymatrix3f &kgcmatp1=kgcmat[p1];
+                const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
+                const tmatrix2f &inv_a=fmath::InverseMatrix2x2(amat2d);
+                b=tsymatrix3f{inv_a.a11, 0.0f, inv_a.a12, 0.0f, 0.0f, inv_a.a22};
+              }else{
+                b=fmath::InverseMatrix3x3(kgcmat[p1]);
+              }
+              frxbar_=frx*b.xx+fry*b.xy+frz*b.xz;
+              frybar_=frx*b.xy+fry*b.yy+frz*b.yz;
+              frzbar_=frx*b.xz+fry*b.yz+frz*b.zz;
             }
+            // if(kgc && pos[p1].z<0.051)PrintTSymatrixf(kgcmat[p1]);
             gradpresp1.x+=p_vpm*frxbar_; gradpresp1.y+=p_vpm*frybar_; gradpresp1.z+=p_vpm*frzbar_;
           }
           //! DELETE THIS
@@ -1108,11 +1118,8 @@ void JSphCpu::ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos,const 
           //-Computes kernel.
           const float fac=fsph::GetKernel_Fac<tker>(CSP,rr2);
 
-          //===== Get volume of particle p2 ===== 
-          const float volp2=MassFluid/velrhop[p2].w;   // Only fluid particles are summed.
-          
           //-Compute matrix elements (symmetric)
-          const float vfac=fac*volp2;
+          const float vfac=fac*MassFluid/velrhop[p2].w;
           kgcmat[p1].xx-=drx*drx*vfac; kgcmat[p1].xy-=drx*dry*vfac; kgcmat[p1].xz-=drx*drz*vfac;
                                        kgcmat[p1].yy-=dry*dry*vfac; kgcmat[p1].yz-=dry*drz*vfac;
                                                                     kgcmat[p1].zz-=drz*drz*vfac;

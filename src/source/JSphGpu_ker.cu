@@ -695,7 +695,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
         }
       }
       //! DELETE THIS
-      if(CODE_IsFluid(code[p2])){
+      if(CODE_IsFluid(code[p1]) && !boundp2){
         const float pressp2=cufsph::ComputePressCte(velrhop2.w);
         const float prs=pressp2-pressp1;
         const float p_vpm=prs*massp2/velrhop2.w;

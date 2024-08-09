@@ -180,7 +180,7 @@
       </Defines>
       <UseHostInclude>false</UseHostInclude>
       <AdditionalOptions>-use_fast_math -Xcompiler "/wd 4267" -Wno-deprecated-gpu-targets %(AdditionalOptions)</AdditionalOptions>
-      <CodeGeneration>compute_70,sm_70;compute_75,sm_75;compute_89,sm_89</CodeGeneration>
+      <CodeGeneration>compute_70,sm_70;compute_75,sm_75;compute_80,sm_80;compute_89,sm_89</CodeGeneration>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">

@@ -278,7 +278,7 @@ protected:
   void ComputeSpsTau(unsigned n,unsigned pini,const tfloat4 *velrhop,const tsymatrix3f *gradvel,tsymatrix3f *tau)const;
 
   template<TpKernel tker> void ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos ,const tfloat4 *velrhop
-    ,const typecode *code,const StDivDataCpu& divdata, const unsigned *dcell, tsymatrix3f *kgcmat)const;
+    ,const StDivDataCpu& divdata, const unsigned *dcell,tfloat4 *shiftposfs,tsymatrix3f *kgcmat)const;
 
   void ComputeVerletVarsFluid(bool shift,const tfloat3 *indirvel,const tfloat4 *velrhop1,const tfloat4 *velrhop2,double dt,double dt2,tdouble3 *pos,unsigned *cell,typecode *code,tfloat4 *velrhopnew)const;
   void ComputeVelrhopBound(const tfloat4* velrhopold,double armul,tfloat4* velrhopnew)const;

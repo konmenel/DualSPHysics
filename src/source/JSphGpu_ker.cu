@@ -524,26 +524,16 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
 {
   //-Kernel Gradient Correction (KGC)
   tsymatrix3f bmat{1,0,0,1,0,1}; //< Unit Matrix (I)
-  float detp1 = 0.0f;
-  if(kgc){
-    if(sim2d){
-        const tsymatrix3f &kgcmatp1=kgcmat[p1];
-        const tmatrix2f amat2d = {kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
-        detp1=cumath::Determinant2x2(amat2d);
-      }else{
-        detp1=cumath::Determinant3x3(kgcmat[p1]);
-      }
-  }
+  if(sim2d)bmat.yy=0;
   //-Non-Symmetric KGC
-  // bool kgcnosym=tkgc==KGC_Momentum && CODE_IsFluid(code[p1]) && detp1>kgcthreshold;
-  if(kgc && tkgc==KGC_Momentum && detp1>kgcthreshold){
+  if(kgc && tkgc==KGC_Momentum && shiftposfsp1.w>kgcthreshold){
     if(sim2d){
       const tsymatrix3f &kgcmatp1=kgcmat[p1];
       const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
-      const tmatrix2f &inv_a=cumath::InverseMatrix2x2(amat2d, detp1);
+      const tmatrix2f inv_a=cumath::InverseMatrix2x2(amat2d);
       bmat=tsymatrix3f{inv_a.a11, 0.0f, inv_a.a12, 0.0f, 0.0f, inv_a.a22};
     }else{
-      bmat=cumath::InverseMatrix3x3(kgcmat[p1],detp1);
+      bmat=cumath::InverseMatrix3x3(kgcmat[p1]);
     }
   }
 
@@ -579,8 +569,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
       }
 
       //-Symmetric KGC
-      // const bool kgcsym=tkgc==KGC_SymMomentum && CODE_IsFluid(code[p1]) && CODE_IsFluid(code[p2]);
-      if(kgc && tkgc==KGC_SymMomentum && !boundp2 && (USE_NOFLOATING || !ftp2) && detp1>kgcthreshold){
+      if(kgc && tkgc==KGC_SymMomentum && !boundp2 && (USE_NOFLOATING || !ftp2) && shiftposfsp1.w>kgcthreshold){
         using cumath::AddMatrix3x3;
         using cumath::MulMatrix3x3;
         const tsymatrix3f &amat=MulMatrix3x3(AddMatrix3x3(kgcmat[p1],kgcmat[p2]),0.5); //< (Ai+Aj)/2
@@ -598,7 +587,6 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
       }
 
       //-Apply KGC only if either one was computed.
-      // const bool applykgc=kgcnosym || kgcsym;
       if(kgc){
         //-Correct the gradient terms (frx_corr=B*frx)
         frxbar=frx*bmat.xx+fry*bmat.xy+frz*bmat.xz;
@@ -661,7 +649,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
             const float amubar=CTE.kernelh*dot_rr2;  //amubar=CTE.kernelh*dot/(rr2+CTE.eta2);
             const float robar=(velrhop1.w+velrhop2.w)*0.5f;
             const float pi_visc=(-visco*cbar*amubar/robar)*(USE_FLOATING? ftmassp2: massp2);
-            acep1.x-=pi_visc*frxbar; acep1.y-=pi_visc*frybar; acep1.z-=pi_visc*frzbar;
+            acep1.x-=pi_visc*frx; acep1.y-=pi_visc*fry; acep1.z-=pi_visc*frz;
           }
         }
         else{//-Laminar+SPS viscosity.
@@ -680,44 +668,42 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
                    taup2=tauff[p2*3+1];   taup2_xz_yy.x+=taup2.x; taup2_xz_yy.y+=taup2.y;
                    taup2=tauff[p2*3+2];   taup2_yz_zz.x+=taup2.x; taup2_yz_zz.y+=taup2.y;
           }
-          acep1.x+=(USE_FLOATING? ftmassp2: massp2)*(taup2_xx_xy.x*frxbar+taup2_xx_xy.y*frybar+taup2_xz_yy.x*frzbar);
-          acep1.y+=(USE_FLOATING? ftmassp2: massp2)*(taup2_xx_xy.y*frxbar+taup2_xz_yy.y*frybar+taup2_yz_zz.x*frzbar);
-          acep1.z+=(USE_FLOATING? ftmassp2: massp2)*(taup2_xz_yy.x*frxbar+taup2_yz_zz.x*frybar+taup2_yz_zz.y*frzbar);
+          acep1.x+=(USE_FLOATING? ftmassp2: massp2)*(taup2_xx_xy.x*frx+taup2_xx_xy.y*fry+taup2_xz_yy.x*frz);
+          acep1.y+=(USE_FLOATING? ftmassp2: massp2)*(taup2_xx_xy.y*frx+taup2_xz_yy.y*fry+taup2_yz_zz.x*frz);
+          acep1.z+=(USE_FLOATING? ftmassp2: massp2)*(taup2_xz_yy.x*frx+taup2_yz_zz.x*fry+taup2_yz_zz.y*frz);
           //-Velocity gradients.
           if(USE_NOFLOATING || !ftp1){//-When p1 is fluid.
             const float volp2=-(USE_FLOATING? ftmassp2: massp2)/velrhop2.w;
-            float dv=dvx*volp2; grap1_xx_xy.x+=dv*frxbar; grap1_xx_xy.y+=dv*frybar; grap1_xz_yy.x+=dv*frzbar;
-                  dv=dvy*volp2; grap1_xx_xy.y+=dv*frxbar; grap1_xz_yy.y+=dv*frybar; grap1_yz_zz.x+=dv*frzbar;
-                  dv=dvz*volp2; grap1_xz_yy.x+=dv*frxbar; grap1_yz_zz.x+=dv*frybar; grap1_yz_zz.y+=dv*frzbar;
+            float dv=dvx*volp2; grap1_xx_xy.x+=dv*frx; grap1_xx_xy.y+=dv*fry; grap1_xz_yy.x+=dv*frz;
+                  dv=dvy*volp2; grap1_xx_xy.y+=dv*frx; grap1_xz_yy.y+=dv*fry; grap1_yz_zz.x+=dv*frz;
+                  dv=dvz*volp2; grap1_xz_yy.x+=dv*frx; grap1_yz_zz.x+=dv*fry; grap1_yz_zz.y+=dv*frz;
             // to compute tau terms we assume that gradvel.xy=gradvel.dudy+gradvel.dvdx, gradvel.xz=gradvel.dudz+gradvel.dwdx, gradvel.yz=gradvel.dvdz+gradvel.dwdy
             // so only 6 elements are needed instead of 3x3.
           }
         }
       }
       //! DELETE THIS
-      if(CODE_IsFluid(code[p1]) && !boundp2){
-        const float pressp2=cufsph::ComputePressCte(velrhop2.w);
-        const float prs=pressp2-pressp1;
-        const float p_vpm=prs*massp2/velrhop2.w;
-        float frxbar_=frx;
-        float frybar_=fry;
-        float frzbar_=frz;
-        if(kgc){
-          tsymatrix3f b{1,0,0,1,0,1}; //< Unit Matrix (I)
-          if(sim2d){
-            const tsymatrix3f &kgcmatp1=kgcmat[p1];
-            const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
-            const tmatrix2f &inv_a=cumath::InverseMatrix2x2(amat2d, detp1);
-            b=tsymatrix3f{inv_a.a11, 0.0f, inv_a.a12, 0.0f, 0.0f, inv_a.a22};
-          }else{
-            b=cumath::InverseMatrix3x3(kgcmat[p1],detp1);
-          }
-          frxbar_=frx*b.xx+fry*b.xy+frz*b.xz;
-          frybar_=frx*b.xy+fry*b.yy+frz*b.yz;
-          frzbar_=frx*b.xz+fry*b.yz+frz*b.zz;
+      const float pressp2=cufsph::ComputePressCte(velrhop2.w);
+      const float prs=pressp2-pressp1;
+      const float p_vpm=prs*massp2/velrhop2.w;
+      float frxbar_=frx;
+      float frybar_=fry;
+      float frzbar_=frz;
+      if(kgc){
+        tsymatrix3f b{1,0,0,1,0,1}; //< Unit Matrix (I)
+        if(sim2d){
+          const tsymatrix3f &kgcmatp1=kgcmat[p1];
+          const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
+          const tmatrix2f &inv_a=cumath::InverseMatrix2x2(amat2d);
+          b=tsymatrix3f{inv_a.a11, 0.0f, inv_a.a12, 0.0f, 0.0f, inv_a.a22};
+        }else{
+          b=cumath::InverseMatrix3x3(kgcmat[p1]);
         }
-        gradpres[p1].x+=p_vpm*frxbar_; gradpres[p1].y+=p_vpm*frybar_; gradpres[p1].z+=p_vpm*frzbar_;
+        frxbar_=frx*b.xx+fry*b.xy+frz*b.xz;
+        frybar_=frx*b.xy+fry*b.yy+frz*b.yz;
+        frzbar_=frx*b.xz+fry*b.yz+frz*b.zz;
       }
+      gradpres[p1].x+=p_vpm*frxbar_; gradpres[p1].y+=p_vpm*frybar_; gradpres[p1].z+=p_vpm*frzbar_;
       //! DELETE THIS
     }
   }
@@ -836,7 +822,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
 template<TpKernel tker>
   __global__ void KerComputeKgcMat(unsigned n,unsigned pinit,int scelldiv,int4 nc
   ,int3 cellzero,const int2 *begincell,unsigned cellfluid,const unsigned *dcell
-  ,const float4 *poscell,const float4 *velrhop,const typecode *code,tsymatrix3f *kgcmat)
+  ,const float4 *poscell,const float4 *velrhop,float4 *shiftposfs,tsymatrix3f *kgcmat)
 {
   const unsigned p=blockIdx.x*blockDim.x + threadIdx.x; //-Number of particle.
   if(p<n){
@@ -856,19 +842,56 @@ template<TpKernel tker>
       if(pfin){
         for(int p2=pini;p2<pfin;p2++){
           const float4 pscellp2=poscell[p2];
-          float drx=pscellp1.x-pscellp2.x + CTE.poscellsize*(PSCEL_GetfX(pscellp1.w)-PSCEL_GetfX(pscellp2.w));
-          float dry=pscellp1.y-pscellp2.y + CTE.poscellsize*(PSCEL_GetfY(pscellp1.w)-PSCEL_GetfY(pscellp2.w));
-          float drz=pscellp1.z-pscellp2.z + CTE.poscellsize*(PSCEL_GetfZ(pscellp1.w)-PSCEL_GetfZ(pscellp2.w));
+          const float drx=pscellp1.x-pscellp2.x + CTE.poscellsize*(PSCEL_GetfX(pscellp1.w)-PSCEL_GetfX(pscellp2.w));
+          const float dry=pscellp1.y-pscellp2.y + CTE.poscellsize*(PSCEL_GetfY(pscellp1.w)-PSCEL_GetfY(pscellp2.w));
+          const float drz=pscellp1.z-pscellp2.z + CTE.poscellsize*(PSCEL_GetfZ(pscellp1.w)-PSCEL_GetfZ(pscellp2.w));
           const float rr2=drx*drx+dry*dry+drz*drz;
-          if(rr2<=CTE.kernelsize2 && rr2>=ALMOSTZERO && CODE_IsFluid(code[p2])){
+          if(rr2<=CTE.kernelsize2 && rr2>=ALMOSTZERO){
             //-Computes kernel.
             const float fac=cufsph::GetKernel_Fac<tker>(rr2);
+            const float frx=fac*drx,fry=fac*dry,frz=fac*drz; //-Gradients.
 
             //-Compute matrix elements (symmetric)
-            const float vfac=fac*CTE.massf/velrhop[p2].w;
+            const float massrhop=CTE.massf/velrhop[p2].w;
+            const float vfac=fac*massrhop;
             kgcmat[p1].xx-=drx*drx*vfac; kgcmat[p1].xy-=drx*dry*vfac; kgcmat[p1].xz-=drx*drz*vfac;
                                          kgcmat[p1].yy-=dry*dry*vfac; kgcmat[p1].yz-=dry*drz*vfac;
                                                                       kgcmat[p1].zz-=drz*drz*vfac;
+            //-For free surface detection (div(r))
+            shiftposfs[p1].w-=massrhop*(drx*frx+dry*fry+drz*frz);
+          }
+        }
+      }
+    }
+
+    //-Interaction with boundaries.
+    ini3-=cellfluid; fin3-=cellfluid;
+    for(int c3=ini3;c3<fin3;c3+=nc.w)for(int c2=ini2;c2<fin2;c2+=nc.x){
+      unsigned pini,pfin=0;  cunsearch::ParticleRange(c2,c3,ini1,fin1,begincell,pini,pfin);
+      if(pfin){
+        for(int p2=pini;p2<pfin;p2++){
+          const float4 pscellp2=poscell[p2];
+          const float drx=pscellp1.x-pscellp2.x + CTE.poscellsize*(PSCEL_GetfX(pscellp1.w)-PSCEL_GetfX(pscellp2.w));
+          const float dry=pscellp1.y-pscellp2.y + CTE.poscellsize*(PSCEL_GetfY(pscellp1.w)-PSCEL_GetfY(pscellp2.w));
+          const float drz=pscellp1.z-pscellp2.z + CTE.poscellsize*(PSCEL_GetfZ(pscellp1.w)-PSCEL_GetfZ(pscellp2.w));
+          const float rr2=drx*drx+dry*dry+drz*drz;
+          if(rr2<=CTE.kernelsize2 && rr2>=ALMOSTZERO){
+            //-Computes kernel.
+            const float fac=cufsph::GetKernel_Fac<tker>(rr2);
+            const float frx=fac*drx,fry=fac*dry,frz=fac*drz; //-Gradients.
+
+            //-Compute matrix elements (symmetric)
+            const float massrhop=CTE.massf/velrhop[p2].w;
+            #if 1
+            if(CTE.tboundary == BC_MDBC){
+              const float vfac=fac*massrhop;
+              kgcmat[p1].xx-=drx*drx*vfac; kgcmat[p1].xy-=drx*dry*vfac; kgcmat[p1].xz-=drx*drz*vfac;
+                                           kgcmat[p1].yy-=dry*dry*vfac; kgcmat[p1].yz-=dry*drz*vfac;
+                                                                        kgcmat[p1].zz-=drz*drz*vfac;
+            }
+            #endif
+            //-For free surface detection (div(r))
+            shiftposfs[p1].w-=massrhop*(drx*frx+dry*fry+drz*frz);
           }
         }
       }
@@ -935,7 +958,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
     dim3 sgridf=GetSimpleGridSize(t.fluidnum,t.bsfluid);
 
     if(kgc)KerComputeKgcMat<tker> <<<sgridf,t.bsfluid,0,t.stm>>>(t.fluidnum,t.fluidini,dvd.scelldiv,dvd.nc,dvd.cellzero
-      ,dvd.beginendcell,dvd.cellfluid,t.dcell,t.poscell,t.velrhop,t.code,t.kgcmat);
+      ,dvd.beginendcell,dvd.cellfluid,t.dcell,t.poscell,t.velrhop,t.shiftposfs,t.kgcmat);
     
     if(t.symmetry){ //<vs_syymmetry_ini>
       KerInteractionForcesFluid<tker,ftmode,lamsps,tdensity,shift,true,kgc> <<<sgridf,t.bsfluid,0,t.stm>>> 

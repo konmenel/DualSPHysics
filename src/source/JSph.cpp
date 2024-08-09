@@ -695,7 +695,7 @@ void JSph::LoadConfigParameters(const JXml *xml){
     default: Run_ExceptioonFile("KernelGradCorrection mode in <execution><parameters> is not valid.",FileXml);
   }
   if(TKgc!=KGC_None){
-    KgcThreshold=eparms.GetValueFloat("KGCthreshold",true,0.6);
+    KgcThreshold=eparms.GetValueFloat("ShiftTFS",true,0);
   }
 
   WrnPartsOut=(eparms.GetValueInt("WrnPartsOut",true,1)!=0);

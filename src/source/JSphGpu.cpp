@@ -872,7 +872,7 @@ void JSphGpu::PreInteractionVars_Forces(unsigned np,unsigned npb){
   //! DETELE THIS
   
   //-Select particles for shifting.
-  if(ShiftPosfsg)Shifting->InitGpu(npf,npb,Posxyg,Poszg,ShiftPosfsg);
+  if(Shifting)Shifting->InitGpu(npf,npb,Posxyg,Poszg,ShiftPosfsg);
 
   //-Apply the extra forces to the correct particle sets.
   if(AccInput)AccInput->RunGpu(TimeStep,Gravity,npf,npb,Codeg,Posxyg,Poszg,Velrhopg,Aceg);
@@ -889,7 +889,7 @@ void JSphGpu::PreInteraction_Forces(){
   Arg=ArraysGpu->ReserveFloat();
   Aceg=ArraysGpu->ReserveFloat3();
   if(DDTArray)Deltag=ArraysGpu->ReserveFloat();
-  if(Shifting)ShiftPosfsg=ArraysGpu->ReserveFloat4();
+  if(Shifting || TKgc!=KGC_None)ShiftPosfsg=ArraysGpu->ReserveFloat4();
   if(TVisco==VISCO_LaminarSPS)SpsGradvelg=ArraysGpu->ReserveSymatrix3f();
   if(TKgc!=KGC_None)KgcMatg=ArraysGpu->ReserveSymatrix3f();
 

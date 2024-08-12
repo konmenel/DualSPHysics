@@ -58,6 +58,7 @@ typedef struct{
   float ovrhopzero;         ///<ovrhopzero=1/RhopZero
   float movlimit;
   unsigned symmetry;   //<vs_syymmetry>
+  bool simulate2d;
   unsigned tboundary;  
   unsigned periactive;
   double xperincx,xperincy,xperincz;

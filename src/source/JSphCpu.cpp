@@ -804,7 +804,7 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
           float frxbar_=frx;
           float frybar_=fry;
           float frzbar_=frz;
-          if(kgc){
+          if(kgc && !boundp2){
             tsymatrix3f b{1,0,0,1,0,1}; //< Unit Matrix (I)
             if(Simulate2D){
               const tsymatrix3f &kgcmatp1=kgcmat[p1];
@@ -1121,7 +1121,7 @@ void JSphCpu::ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos,const 
 
           //-Compute matrix elements (symmetric)
           const float massrhop=MassFluid/velrhop[p2].w;
-          #if 1
+          #if 0
           if(TBoundary == BC_MDBC){
             const float vfac=fac*massrhop;
             kgcmat[p1].xx-=drx*drx*vfac; kgcmat[p1].xy-=drx*dry*vfac; kgcmat[p1].xz-=drx*drz*vfac;

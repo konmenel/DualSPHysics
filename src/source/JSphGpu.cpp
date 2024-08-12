@@ -579,6 +579,7 @@ void JSphGpu::ConstantDataUp(){
   ctes.maprealposminx=MapRealPosMin.x; ctes.maprealposminy=MapRealPosMin.y; ctes.maprealposminz=MapRealPosMin.z;
   ctes.maprealsizex=MapRealSize.x; ctes.maprealsizey=MapRealSize.y; ctes.maprealsizez=MapRealSize.z;
   ctes.symmetry=Symmetry;   //<vs_syymmetry>
+  ctes.simulate2d=Simulate2D;
   ctes.tboundary=unsigned(TBoundary);
   ctes.periactive=PeriActive;
   ctes.xperincx=PeriXinc.x; ctes.xperincy=PeriXinc.y; ctes.xperincz=PeriXinc.z;

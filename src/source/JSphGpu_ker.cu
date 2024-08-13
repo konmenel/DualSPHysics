@@ -525,8 +525,8 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
   //-Kernel Gradient Correction (KGC)
   tsymatrix3f bmat{1,0,0,1,0,1}; //< Unit Matrix (I)
   if(CTE.simulate2d)bmat.yy=0;
-  //-Non-Symmetric KGC
-  if(kgc && tkgc==KGC_Momentum && shiftposfsp1.w>kgcthreshold){
+  //-Bonet and Lok KGC
+  if(kgc && (tkgc==KGC_BonetLok || tkgc==KGC_BonetLokMinusOp) && !boundp2 && shiftposfsp1.w>kgcthreshold){
     if(CTE.simulate2d){
       const tsymatrix3f &kgcmatp1=kgcmat[p1];
       const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
@@ -568,11 +568,11 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
         compute=!(USE_FTEXTERNAL && ftp1 && (boundp2 || ftp2)); //-Deactivated when DEM or Chrono is used and is float-float or float-bound. | Se desactiva cuando se usa DEM o Chrono y es float-float o float-bound.
       }
 
-      //-Symmetric KGC
-      if(kgc && tkgc==KGC_SymMomentum && !boundp2 && (USE_NOFLOATING || !ftp2) && shiftposfsp1.w>kgcthreshold){
+      //-Zago KGC
+      if(kgc && (tkgc==KGC_Zago || tkgc==KGC_ZagoMinusOp) && !boundp2 && !ftp2 && shiftposfsp1.w>kgcthreshold){
         using cumath::AddMatrix3x3;
         using cumath::MulMatrix3x3;
-        const tsymatrix3f &amat=MulMatrix3x3(AddMatrix3x3(kgcmat[p1],kgcmat[p2]),0.5); //< (Ai+Aj)/2
+        const tsymatrix3f amat=MulMatrix3x3(AddMatrix3x3(kgcmat[p1],kgcmat[p2]),0.5); //< (Ai+Aj)/2
         if(CTE.simulate2d){
           const tmatrix2f amat2d{amat.xx, amat.xz, amat.xz, amat.zz};
           const float detamat=cumath::Determinant2x2(amat2d);
@@ -683,27 +683,29 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
         }
       }
       //! DELETE THIS
-      const float pressp2=cufsph::ComputePressCte(velrhop2.w);
-      const float prs=pressp2-pressp1;
-      const float p_vpm=prs*massp2/velrhop2.w;
-      float frxbar_=frx;
-      float frybar_=fry;
-      float frzbar_=frz;
-      if(kgc && !boundp2){
-        tsymatrix3f b{1,0,0,1,0,1}; //< Unit Matrix (I)
-        if(CTE.simulate2d){
-          const tsymatrix3f &kgcmatp1=kgcmat[p1];
-          const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
-          const tmatrix2f &inv_a=cumath::InverseMatrix2x2(amat2d);
-          b=tsymatrix3f{inv_a.a11, 0.0f, inv_a.a12, 0.0f, 0.0f, inv_a.a22};
-        }else{
-          b=cumath::InverseMatrix3x3(kgcmat[p1]);
+      if(!boundp2){
+        const float pressp2=cufsph::ComputePressCte(velrhop2.w);
+        const float prs=pressp2-pressp1;
+        const float p_vpm=prs*massp2/velrhop2.w;
+        float frxbar_=frx;
+        float frybar_=fry;
+        float frzbar_=frz;
+        if(kgc){
+          tsymatrix3f b{1,0,0,1,0,1}; //< Unit Matrix (I)
+          if(CTE.simulate2d){
+            const tsymatrix3f &kgcmatp1=kgcmat[p1];
+            const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
+            const tmatrix2f &inv_a=cumath::InverseMatrix2x2(amat2d);
+            b=tsymatrix3f{inv_a.a11, 0.0f, inv_a.a12, 0.0f, 0.0f, inv_a.a22};
+          }else{
+            b=cumath::InverseMatrix3x3(kgcmat[p1]);
+          }
+          frxbar_=frx*b.xx+fry*b.xy+frz*b.xz;
+          frybar_=frx*b.xy+fry*b.yy+frz*b.yz;
+          frzbar_=frx*b.xz+fry*b.yz+frz*b.zz;
         }
-        frxbar_=frx*b.xx+fry*b.xy+frz*b.xz;
-        frybar_=frx*b.xy+fry*b.yy+frz*b.yz;
-        frzbar_=frx*b.xz+fry*b.yz+frz*b.zz;
+        gradpres[p1].x+=p_vpm*frxbar_; gradpres[p1].y+=p_vpm*frybar_; gradpres[p1].z+=p_vpm*frzbar_;
       }
-      gradpres[p1].x+=p_vpm*frxbar_; gradpres[p1].y+=p_vpm*frybar_; gradpres[p1].z+=p_vpm*frzbar_;
       //! DELETE THIS
     }
   }
@@ -819,10 +821,11 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
   }
 }
 
-template<TpKernel tker>
+template<TpKernel tker,TpFtMode ftmode>
   __global__ void KerComputeKgcMat(unsigned n,unsigned pinit,int scelldiv,int4 nc
   ,int3 cellzero,const int2 *begincell,unsigned cellfluid,const unsigned *dcell
-  ,const float4 *poscell,const float4 *velrhop,float4 *shiftposfs,tsymatrix3f *kgcmat)
+  ,const float4 *poscell,const float4 *velrhop,const typecode *code,const float *ftomassp
+  ,float4 *shiftposfs,tsymatrix3f *kgcmat)
 {
   const unsigned p=blockIdx.x*blockDim.x + threadIdx.x; //-Number of particle.
   if(p<n){
@@ -880,10 +883,13 @@ template<TpKernel tker>
             const float fac=cufsph::GetKernel_Fac<tker>(rr2);
             const float frx=fac*drx,fry=fac*dry,frz=fac*drz; //-Gradients.
 
+            const bool ftp2=(USE_FLOATING && CODE_IsFloating(code[p2]));
+            const float massp2=(ftp2? ftomassp[CODE_GetTypeValue(code[p2])]: CTE.massb);
+
             //-Compute matrix elements (symmetric)
-            const float massrhop=CTE.massf/velrhop[p2].w;
-            #if 0
-            if(CTE.tboundary == BC_MDBC){
+            const float massrhop=massp2/velrhop[p2].w;
+            #if 1
+            if(CTE.tboundary==BC_MDBC){
               const float vfac=fac*massrhop;
               kgcmat[p1].xx-=drx*drx*vfac; kgcmat[p1].xy-=drx*dry*vfac; kgcmat[p1].xz-=drx*drz*vfac;
                                            kgcmat[p1].yy-=dry*dry*vfac; kgcmat[p1].yz-=dry*drz*vfac;
@@ -957,8 +963,8 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
     //printf("[ns:%u  id:%d] halo:%d fini:%d(%d) bini:%d(%d)\n",t.nstep,t.id,t.halo,t.fluidini,t.fluidnum,t.boundini,t.boundnum);
     dim3 sgridf=GetSimpleGridSize(t.fluidnum,t.bsfluid);
 
-    if(kgc)KerComputeKgcMat<tker> <<<sgridf,t.bsfluid,0,t.stm>>>(t.fluidnum,t.fluidini,dvd.scelldiv,dvd.nc,dvd.cellzero
-      ,dvd.beginendcell,dvd.cellfluid,t.dcell,t.poscell,t.velrhop,t.shiftposfs,t.kgcmat);
+    if(kgc)KerComputeKgcMat<tker,ftmode> <<<sgridf,t.bsfluid,0,t.stm>>>(t.fluidnum,t.fluidini,dvd.scelldiv,dvd.nc,dvd.cellzero
+      ,dvd.beginendcell,dvd.cellfluid,t.dcell,t.poscell,t.velrhop,t.code,t.ftomassp,t.shiftposfs,t.kgcmat);
     
     if(t.symmetry){ //<vs_syymmetry_ini>
       KerInteractionForcesFluid<tker,ftmode,lamsps,tdensity,shift,true,kgc> <<<sgridf,t.bsfluid,0,t.stm>>> 

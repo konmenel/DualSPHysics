@@ -371,9 +371,11 @@ typedef enum{
 
 ///Types for Kernel Gradient Correction
 typedef enum{
-  KGC_None=0,         ///<No Kernel Gradient Correction is appled.
-  KGC_Momentum=1,     ///<Kernel Gradient Correction is appled only on momentum equation.
-  KGC_SymMomentum=2   ///<Symmetric Kernel Gradient Correction is appled only on momentum equation.
+  KGC_None=0,         ///<No Kernel Gradient Correction (KGC) is appled.
+  KGC_BonetLok=1,         ///<KGC from Bonet and Lok.
+  KGC_Zago=2,             ///<KGC from Zago et al.
+  KGC_BonetLokMinusOp=3,  ///<KGC from Bonet and Lok with minus operator in the interior and plus on the free surface.
+  KGC_ZagoMinusOp=4       ///<KGC from Zago et al with minus operator in the interior and plus on the free surface.
 }TpKgc;
 
 ///Structure with main SPH constants and configurations.

@@ -716,8 +716,8 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
     //-Kernel Gradient Correction (KGC)
     tsymatrix3f bmat{1,0,0,1,0,1}; //< Unit Matrix (I)
     if(Simulate2D)bmat.yy=0;
-    //-Non-Symmetric KGC
-    if(kgc && tkgc==KGC_Momentum && shiftposfs[p1].w>KgcThreshold){
+    //-Bonet and Lok
+    if(kgc && (tkgc==KGC_BonetLok || tkgc==KGC_BonetLokMinusOp) && shiftposfs[p1].w>KgcThreshold){
       if(Simulate2D){
         const tsymatrix3f &kgcmatp1=kgcmat[p1];
         const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
@@ -767,9 +767,9 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
           tfloat4 velrhop2=velrhop[p2];
           if(rsym)velrhop2.y=-velrhop2.y; //<vs_syymmetry>
 
-          //-Symmetric KGC
-          if(kgc && tkgc==KGC_SymMomentum && !boundp2 && !ftp2 && shiftposfs[p1].w>KgcThreshold){
-            const tsymatrix3f &amat=(kgcmat[p1]+kgcmat[p2])*0.5;
+          //-Zago KGC
+          if(kgc && (tkgc==KGC_Zago || tkgc==KGC_ZagoMinusOp) && !boundp2 && !ftp2 && shiftposfs[p1].w>KgcThreshold){
+            const tsymatrix3f amat=(kgcmat[p1]+kgcmat[p2])*0.5;
             if(Simulate2D){
               const tmatrix2f amat2d{amat.xx, amat.xz, amat.xz, amat.zz};
               const float detamat=fmath::Determinant2x2(amat2d);
@@ -783,7 +783,7 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
             }
           }
 
-          //-Apply KGC only if other one was culculated.
+          //-Apply KGC in gradient
           if(kgc){
             //-Correct the gradient terms (frx_corr=B*frx)
             frxbar=frx*bmat.xx+fry*bmat.xy+frz*bmat.xz;
@@ -798,27 +798,29 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
             acep1.x+=p_vpm*frxbar; acep1.y+=p_vpm*frybar; acep1.z+=p_vpm*frzbar;
           }
           //! DELETE THIS
-          const float prs=press[p2]-pressp1;
-          const float p_vpm=prs*massp2/velrhop2.w;
-          // const float p_vpm=1.0f*massp2/velrhop2.w; // Gradient of 1
-          float frxbar_=frx;
-          float frybar_=fry;
-          float frzbar_=frz;
-          if(kgc && !boundp2){
-            tsymatrix3f b{1,0,0,1,0,1}; //< Unit Matrix (I)
-            if(Simulate2D){
-              const tsymatrix3f &kgcmatp1=kgcmat[p1];
-              const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
-              const tmatrix2f &inv_a=fmath::InverseMatrix2x2(amat2d);
-              b=tsymatrix3f{inv_a.a11, 0.0f, inv_a.a12, 0.0f, 0.0f, inv_a.a22};
-            }else{
-              b=fmath::InverseMatrix3x3(kgcmat[p1]);
+          if(true){
+            const float prs=press[p2]-pressp1;
+            const float p_vpm=prs*massp2/velrhop2.w;
+            // const float p_vpm=1.0f*massp2/velrhop2.w; // Gradient of 1
+            float frxbar_=frx;
+            float frybar_=fry;
+            float frzbar_=frz;
+            if(kgc){
+              tsymatrix3f b{1,0,0,1,0,1}; //< Unit Matrix (I)
+              if(Simulate2D){
+                const tsymatrix3f &kgcmatp1=kgcmat[p1];
+                const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
+                const tmatrix2f &inv_a=fmath::InverseMatrix2x2(amat2d);
+                b=tsymatrix3f{inv_a.a11, 0.0f, inv_a.a12, 0.0f, 0.0f, inv_a.a22};
+              }else{
+                b=fmath::InverseMatrix3x3(kgcmat[p1]);
+              }
+              frxbar_=frx*b.xx+fry*b.xy+frz*b.xz;
+              frybar_=frx*b.xy+fry*b.yy+frz*b.yz;
+              frzbar_=frx*b.xz+fry*b.yz+frz*b.zz;
             }
-            frxbar_=frx*b.xx+fry*b.xy+frz*b.xz;
-            frybar_=frx*b.xy+fry*b.yy+frz*b.yz;
-            frzbar_=frx*b.xz+fry*b.yz+frz*b.zz;
+            gradpresp1.x+=p_vpm*frxbar_; gradpresp1.y+=p_vpm*frybar_; gradpresp1.z+=p_vpm*frzbar_;
           }
-          gradpresp1.x+=p_vpm*frxbar_; gradpresp1.y+=p_vpm*frybar_; gradpresp1.z+=p_vpm*frzbar_;
           //! DELETE THIS
 
           //-Density derivative (Continuity equation).
@@ -1065,9 +1067,9 @@ void JSphCpu::ComputeSpsTau(unsigned n,unsigned pini,const tfloat4 *velrhop,cons
 //==============================================================================
 /// Compute the Kernel Gradient Correction matrices.   
 //==============================================================================
-template<TpKernel tker>
+template<TpKernel tker,TpFtMode ftmode>
 void JSphCpu::ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos,const tfloat4 *velrhop
-  ,const StDivDataCpu& divdata,const unsigned *dcell,tfloat4 *shiftposfs,tsymatrix3f *kgcmat)const{
+  ,const StDivDataCpu& divdata,const unsigned *dcell,const typecode *code,tfloat4 *shiftposfs,tsymatrix3f *kgcmat)const{
   const int pfin=int(pini+n);
   #ifdef OMP_USE
     #pragma omp parallel for schedule (static)
@@ -1119,10 +1121,13 @@ void JSphCpu::ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos,const 
           const float fac=fsph::GetKernel_Fac<tker>(CSP,rr2);
           const float frx=fac*drx,fry=fac*dry,frz=fac*drz; //-Gradients.
 
+          const bool ftp2=(USE_FLOATING && CODE_IsFloating(code[p2]));
+          const float massp2=(ftp2? FtObjs[CODE_GetTypeValue(code[p2])].massp: MassBound);
+
           //-Compute matrix elements (symmetric)
-          const float massrhop=MassFluid/velrhop[p2].w;
-          #if 0
-          if(TBoundary == BC_MDBC){
+          const float massrhop=massp2/velrhop[p2].w;
+          #if 1
+          if(TBoundary==BC_MDBC){
             const float vfac=fac*massrhop;
             kgcmat[p1].xx-=drx*drx*vfac; kgcmat[p1].xy-=drx*dry*vfac; kgcmat[p1].xz-=drx*drz*vfac;
                                          kgcmat[p1].yy-=dry*dry*vfac; kgcmat[p1].yz-=dry*drz*vfac;
@@ -1146,7 +1151,7 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
 {
   float viscdt=res.viscdt;
   if(t.npf){
-    if(kgc)ComputeKgcMat<tker>(t.npf,t.npb,t.pos,t.velrhop,t.divdata,t.dcell,t.shiftposfs,t.kgcmat);
+    if(kgc)ComputeKgcMat<tker,ftmode>(t.npf,t.npb,t.pos,t.velrhop,t.divdata,t.dcell,t.code,t.shiftposfs,t.kgcmat);
 
     //-Interaction Fluid-Fluid.
     InteractionForcesFluid<tker,ftmode,tvisco,tdensity,shift,kgc> (t.npf,t.npb,false,Visco                 

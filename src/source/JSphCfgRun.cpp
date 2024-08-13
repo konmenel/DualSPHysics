@@ -373,7 +373,7 @@ void JSphCfgRun::LoadOpts(string *optlis,int optn,int lv,const std::string &file
       }
       else if(txword=="KGC"){
         TKgc=atoi(txoptfull.c_str()); 
-        if(TKgc<0 || TKgc>2)ErrorParm(opt,c,lv,file);
+        if(TKgc<0 || TKgc>4)ErrorParm(opt,c,lv,file);
       }
       else if(txword=="SVNORMALS")SvNormals=(txoptfull!=""? atoi(txoptfull.c_str()): 1)!=0;
       else if(txword=="SVRES")SvRes=(txoptfull!=""? atoi(txoptfull.c_str()): 1)!=0;

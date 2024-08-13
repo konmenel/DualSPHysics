@@ -690,8 +690,10 @@ void JSph::LoadConfigParameters(const JXml *xml){
   //-Kernel Gradient Correction
   switch(eparms.GetValueInt("KernelGradCorrection",true,0)){
     case 0:  TKgc=KGC_None;     break;
-    case 1:  TKgc=KGC_Momentum;  break;
-    case 2:  TKgc=KGC_SymMomentum;  break;
+    case 1:  TKgc=KGC_BonetLok;  break;
+    case 2:  TKgc=KGC_Zago;  break;
+    case 3:  TKgc=KGC_BonetLokMinusOp;  break;
+    case 4:  TKgc=KGC_ZagoMinusOp;  break;
     default: Run_ExceptioonFile("KernelGradCorrection mode in <execution><parameters> is not valid.",FileXml);
   }
   if(TKgc!=KGC_None){
@@ -853,8 +855,10 @@ void JSph::LoadConfigCommands(const JSphCfgRun *cfg){
   if(cfg->TKgc>=0){
       switch(cfg->TKgc){
       case 0:  TKgc=KGC_None;     break;
-      case 1:  TKgc=KGC_Momentum;  break;
-      case 2:  TKgc=KGC_SymMomentum;  break;
+      case 1:  TKgc=KGC_BonetLok;  break;
+      case 2:  TKgc=KGC_Zago;  break;
+      case 3:  TKgc=KGC_BonetLokMinusOp;  break;
+      case 4:  TKgc=KGC_ZagoMinusOp;  break;
       default: Run_ExceptioonFile("KernelGradCorrection mode is not valid.",FileXml);
     }
   }
@@ -3161,10 +3165,12 @@ std::string JSph::GetDDTName(TpDensity tdensity)const{
 std::string JSph::GetKGCName(TpKgc tkgc){
   string tx;
   switch(tkgc){
-    case KGC_None:        tx="None"; break;
-    case KGC_Momentum:    tx="Momentum equation"; break;
-    case KGC_SymMomentum: tx="Symmetric Momentum equation"; break;
-    default:              tx="???";
+    case KGC_None:            tx="None"; break;
+    case KGC_BonetLok:        tx="Bonet and Lok"; break;
+    case KGC_Zago:            tx="Zago et al"; break;
+    case KGC_BonetLokMinusOp: tx="Bonet and Lok minus operator"; break;
+    case KGC_ZagoMinusOp:     tx="Zago et al minus operator"; break;
+    default:                  tx="???";
   }
   return(tx);
 }

@@ -466,6 +466,7 @@ void JSphCpu::PreInteractionVars_Forces(unsigned np,unsigned npb){
   memset(Acec,0,sizeof(tfloat3)*np);                                 //Acec[]=(0,0,0)
   if(SpsGradvelc)memset(SpsGradvelc+npb,0,sizeof(tsymatrix3f)*npf);  //SpsGradvelc[]=(0,0,0,0,0,0).
   if(KgcMatc)memset(KgcMatc+npb,0,sizeof(tsymatrix3f)*npf);          //KgcMatc[]=(0,0,0,0,0,0).
+  if(ShiftPosfsc)memset(ShiftPosfsc+npb,0,sizeof(tfloat4)*npf);  //ShiftPosfsc[]=(0,0,0,0).
   //! DETELE THIS
   memset(GradPresc+npb,0,sizeof(tfloat3)*npf);
   //! DETELE THIS
@@ -675,7 +676,7 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
   ,const float *press,const tfloat3 *dengradcorr
   ,float &viscdt,float *ar,tfloat3 *ace,float *delta
   ,TpShifting shiftmode,tfloat4 *shiftposfs
-  ,TpKgc tkgc,const tsymatrix3f* kgcmat/*! DELETE THIS */,tfloat3 *gradpres/*! DELETE THIS */)const
+  ,const tsymatrix3f* kgcmat/*! DELETE THIS */,tfloat3 *gradpres/*! DELETE THIS */)const
 {
   //-Initialize viscth to calculate viscdt maximo con OpenMP. | Inicializa viscth para calcular visdt maximo con OpenMP.
   float viscth[OMP_MAXTHREADS*OMP_STRIDE];
@@ -695,7 +696,7 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
 
     //-Variables for Shifting.
     tfloat4 shiftposfsp1;
-    if(shift)shiftposfsp1=shiftposfs[p1];
+    if(shift || kgc)shiftposfsp1=shiftposfs[p1];
 
     //-Obtain data of particle p1 in case of floating objects. | Obtiene datos de particula p1 en caso de existir floatings.
     bool ftp1=false;     //-Indicate if it is floating. | Indica si es floating.
@@ -717,7 +718,7 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
     tsymatrix3f bmat{1,0,0,1,0,1}; //< Unit Matrix (I)
     if(Simulate2D)bmat.yy=0;
     //-Bonet and Lok
-    if(kgc && (tkgc==KGC_BonetLok || tkgc==KGC_BonetLokMinusOp) && shiftposfs[p1].w>KgcThreshold){
+    if(kgc && !boundp2 && (TKgc==KGC_BonetLok || TKgc==KGC_BonetLokMinusOp) && shiftposfs[p1].w>KgcThreshold){
       if(Simulate2D){
         const tsymatrix3f &kgcmatp1=kgcmat[p1];
         const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
@@ -768,18 +769,15 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
           if(rsym)velrhop2.y=-velrhop2.y; //<vs_syymmetry>
 
           //-Zago KGC
-          if(kgc && (tkgc==KGC_Zago || tkgc==KGC_ZagoMinusOp) && !boundp2 && !ftp2 && shiftposfs[p1].w>KgcThreshold){
+          if(kgc && !boundp2 && !ftp2 &&(TKgc==KGC_Zago || TKgc==KGC_ZagoMinusOp) && shiftposfs[p1].w>KgcThreshold){
             const tsymatrix3f amat=(kgcmat[p1]+kgcmat[p2])*0.5;
             if(Simulate2D){
               const tmatrix2f amat2d{amat.xx, amat.xz, amat.xz, amat.zz};
               const float detamat=fmath::Determinant2x2(amat2d);
-              if(detamat>KgcThreshold){
-                const tmatrix2f &inv_a=fmath::InverseMatrix2x2(amat2d, detamat);
-                bmat=tsymatrix3f{inv_a.a11, 0.0f, inv_a.a12, 0.0f, 0.0f, inv_a.a22};
-              }
+              const tmatrix2f inv_a=fmath::InverseMatrix2x2(amat2d, detamat);
+              bmat=tsymatrix3f{inv_a.a11, 0.0f, inv_a.a12, 0.0f, 0.0f, inv_a.a22};
             }else{
-              const float detamat=fmath::Determinant3x3(amat);
-              if(detamat>KgcThreshold)bmat=fmath::InverseMatrix3x3(amat, detamat);
+              bmat=fmath::InverseMatrix3x3(amat);
             }
           }
 
@@ -793,12 +791,19 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
 
           //-Velocity derivative (Momentum equation).
           if(compute){
-            const float prs=(pressp1+press[p2])/(rhopp1*velrhop2.w) + (tker==KERNEL_Cubic? fsph::GetKernelCubic_Tensil(CSP,rr2,rhopp1,pressp1,velrhop2.w,press[p2]): 0);
-            const float p_vpm=-prs*massp2;
-            acep1.x+=p_vpm*frxbar; acep1.y+=p_vpm*frybar; acep1.z+=p_vpm*frzbar;
+            if(kgc && (TKgc==KGC_BonetLokMinusOp || TKgc==KGC_ZagoMinusOp)){
+              const float prs_tensile=(tker==KERNEL_Cubic? fsph::GetKernelCubic_Tensil(CSP,rr2,rhopp1,pressp1,velrhop2.w,press[p2]): 0);
+              const float prs=(shiftposfsp1.w>KgcThreshold? press[p2]-pressp1: pressp1+press[p2])/(rhopp1*velrhop2.w) + prs_tensile;
+              const float p_vpm=-prs*massp2;
+              acep1.x+=p_vpm*frxbar; acep1.y+=p_vpm*frybar; acep1.z+=p_vpm*frzbar;
+            }else{
+              const float prs=(pressp1+press[p2])/(rhopp1*velrhop2.w) + (tker==KERNEL_Cubic? fsph::GetKernelCubic_Tensil(CSP,rr2,rhopp1,pressp1,velrhop2.w,press[p2]): 0);
+              const float p_vpm=-prs*massp2;
+              acep1.x+=p_vpm*frxbar; acep1.y+=p_vpm*frybar; acep1.z+=p_vpm*frzbar;
+            }
           }
           //! DELETE THIS
-          if(true){
+          if(!boundp2){
             const float prs=press[p2]-pressp1;
             const float p_vpm=prs*massp2/velrhop2.w;
             // const float p_vpm=1.0f*massp2/velrhop2.w; // Gradient of 1
@@ -1106,6 +1111,7 @@ void JSphCpu::ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos,const 
       }
     }
 
+    #if 0
     //--Boundary neighbors
     ngs=nsearch::Init(posp1,true,divdata);
     for(int z=ngs.zini;z<ngs.zfin;z++)for(int y=ngs.yini;y<ngs.yfin;y++){
@@ -1126,7 +1132,7 @@ void JSphCpu::ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos,const 
 
           //-Compute matrix elements (symmetric)
           const float massrhop=massp2/velrhop[p2].w;
-          #if 1
+          #if 0
           if(TBoundary==BC_MDBC){
             const float vfac=fac*massrhop;
             kgcmat[p1].xx-=drx*drx*vfac; kgcmat[p1].xy-=drx*dry*vfac; kgcmat[p1].xz-=drx*drz*vfac;
@@ -1139,6 +1145,7 @@ void JSphCpu::ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos,const 
         }
       }
     }
+    #endif
   }
 }
 
@@ -1156,11 +1163,11 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
     //-Interaction Fluid-Fluid.
     InteractionForcesFluid<tker,ftmode,tvisco,tdensity,shift,kgc> (t.npf,t.npb,false,Visco                 
       ,t.divdata,t.dcell,t.spstau,t.spsgradvel,t.pos,t.velrhop,t.code,t.idp,t.press,t.dengradcorr
-      ,viscdt,t.ar,t.ace,t.delta,t.shiftmode,t.shiftposfs,t.tkgc,t.kgcmat/*! DELETE THIS*/,t.gradpres/*! DELETE THIS*/);
+      ,viscdt,t.ar,t.ace,t.delta,t.shiftmode,t.shiftposfs,t.kgcmat/*! DELETE THIS*/,t.gradpres/*! DELETE THIS*/);
     //-Interaction Fluid-Bound.
     InteractionForcesFluid<tker,ftmode,tvisco,tdensity,shift,kgc> (t.npf,t.npb,true ,Visco*ViscoBoundFactor
       ,t.divdata,t.dcell,t.spstau,t.spsgradvel,t.pos,t.velrhop,t.code,t.idp,t.press,NULL
-      ,viscdt,t.ar,t.ace,t.delta,t.shiftmode,t.shiftposfs,t.tkgc,t.kgcmat/*! DELETE THIS*/,t.gradpres/*! DELETE THIS*/);
+      ,viscdt,t.ar,t.ace,t.delta,t.shiftmode,t.shiftposfs,t.kgcmat/*! DELETE THIS*/,t.gradpres/*! DELETE THIS*/);
 
     //-Interaction of DEM Floating-Bound & Floating-Floating. //(DEM)
     if(UseDEM)InteractionForcesDEM(CaseNfloat,t.divdata,t.dcell

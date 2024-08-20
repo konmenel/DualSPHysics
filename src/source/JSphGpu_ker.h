@@ -59,7 +59,8 @@ typedef struct{
   float movlimit;
   unsigned symmetry;   //<vs_syymmetry>
   bool simulate2d;
-  unsigned tboundary;  
+  unsigned tkgc;
+  unsigned tboundary;
   unsigned periactive;
   double xperincx,xperincy,xperincz;
   double yperincx,yperincy,yperincz;

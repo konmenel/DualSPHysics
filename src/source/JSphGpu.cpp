@@ -580,6 +580,7 @@ void JSphGpu::ConstantDataUp(){
   ctes.maprealsizex=MapRealSize.x; ctes.maprealsizey=MapRealSize.y; ctes.maprealsizez=MapRealSize.z;
   ctes.symmetry=Symmetry;   //<vs_syymmetry>
   ctes.simulate2d=Simulate2D;
+  ctes.tkgc=unsigned(TKgc);
   ctes.tboundary=unsigned(TBoundary);
   ctes.periactive=PeriActive;
   ctes.xperincx=PeriXinc.x; ctes.xperincy=PeriXinc.y; ctes.xperincz=PeriXinc.z;
@@ -868,6 +869,7 @@ void JSphGpu::PreInteractionVars_Forces(unsigned np,unsigned npb){
   cudaMemset(Aceg,0,sizeof(tfloat3)*np);                                 //Aceg[]=(0,0,0)
   if(SpsGradvelg)cudaMemset(SpsGradvelg+npb,0,sizeof(tsymatrix3f)*npf);  //SpsGradvelg[]=(0,0,0,0,0,0).
   if(KgcMatg)cudaMemset(KgcMatg+npb,0,sizeof(tsymatrix3f)*npf);          //KgcMatc[]=(0,0,0,0,0,0).
+  if(ShiftPosfsg)cudaMemset(ShiftPosfsg+npb,0,sizeof(float4)*npf);  //ShiftPosfsg[]=(0,0,0,0).
   //! DETELE THIS
   cudaMemset(GradPresg+npb,0,sizeof(tfloat3)*npf);
   //! DETELE THIS

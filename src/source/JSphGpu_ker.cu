@@ -520,13 +520,13 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
   ,float2 &grap1_xx_xy,float2 &grap1_xz_yy,float2 &grap1_yz_zz
   ,float3 &acep1,float &arp1,float &visc,float &deltap1
   ,TpShifting shiftmode,float4 &shiftposfsp1
-  ,TpKgc tkgc,const tsymatrix3f *kgcmat,float kgcthreshold/*! DELETE THIS */,float3 *gradpres/*! DELETE THIS */)
+  ,const tsymatrix3f *kgcmat,float kgcthreshold/*! DELETE THIS */,float3 *gradpres/*! DELETE THIS */)
 {
   //-Kernel Gradient Correction (KGC)
   tsymatrix3f bmat{1,0,0,1,0,1}; //< Unit Matrix (I)
   if(CTE.simulate2d)bmat.yy=0;
   //-Bonet and Lok KGC
-  if(kgc && (tkgc==KGC_BonetLok || tkgc==KGC_BonetLokMinusOp) && !boundp2 && shiftposfsp1.w>kgcthreshold){
+  if(kgc && !boundp2 && (CTE.tkgc==KGC_BonetLok || CTE.tkgc==KGC_BonetLokMinusOp) && shiftposfsp1.w>kgcthreshold){
     if(CTE.simulate2d){
       const tsymatrix3f &kgcmatp1=kgcmat[p1];
       const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
@@ -569,7 +569,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
       }
 
       //-Zago KGC
-      if(kgc && (tkgc==KGC_Zago || tkgc==KGC_ZagoMinusOp) && !boundp2 && !ftp2 && shiftposfsp1.w>kgcthreshold){
+      if(kgc && !boundp2 && !ftp2 && (CTE.tkgc==KGC_Zago || CTE.tkgc==KGC_ZagoMinusOp) && shiftposfsp1.w>kgcthreshold){
         using cumath::AddMatrix3x3;
         using cumath::MulMatrix3x3;
         const tsymatrix3f amat=MulMatrix3x3(AddMatrix3x3(kgcmat[p1],kgcmat[p2]),0.5); //< (Ai+Aj)/2
@@ -599,11 +599,19 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
 
       //-Velocity derivative (Momentum equation).
       if(compute){
-        const float pressp2=cufsph::ComputePressCte(velrhop2.w);
-        const float prs=(pressp1+pressp2)/(velrhop1.w*velrhop2.w)
-          +(tker==KERNEL_Cubic? cufsph::GetKernelCubic_Tensil(rr2,velrhop1.w,pressp1,velrhop2.w,pressp2): 0);
-        const float p_vpm=-prs*(USE_FLOATING? ftmassp2: massp2);
-        acep1.x+=p_vpm*frxbar; acep1.y+=p_vpm*frybar; acep1.z+=p_vpm*frzbar;
+        if(kgc && (CTE.tkgc==KGC_BonetLokMinusOp || CTE.tkgc==KGC_ZagoMinusOp)){
+          const float pressp2=cufsph::ComputePressCte(velrhop2.w);
+          const float prs=(shiftposfsp1.w>kgcthreshold? pressp2-pressp1: pressp1+pressp2)/(velrhop1.w*velrhop2.w)
+            +(tker==KERNEL_Cubic? cufsph::GetKernelCubic_Tensil(rr2,velrhop1.w,pressp1,velrhop2.w,pressp2): 0);
+          const float p_vpm=-prs*(USE_FLOATING? ftmassp2: massp2);
+          acep1.x+=p_vpm*frxbar; acep1.y+=p_vpm*frybar; acep1.z+=p_vpm*frzbar;
+        }else{
+          const float pressp2=cufsph::ComputePressCte(velrhop2.w);
+          const float prs=(pressp1+pressp2)/(velrhop1.w*velrhop2.w)
+            +(tker==KERNEL_Cubic? cufsph::GetKernelCubic_Tensil(rr2,velrhop1.w,pressp1,velrhop2.w,pressp2): 0);
+          const float p_vpm=-prs*(USE_FLOATING? ftmassp2: massp2);
+          acep1.x+=p_vpm*frxbar; acep1.y+=p_vpm*frybar; acep1.z+=p_vpm*frzbar;
+        }
       }
 
       //-Density derivative (Continuity equation).
@@ -735,7 +743,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
 
     //-Variables for Shifting.
     float4 shiftposfsp1;
-    if(shift)shiftposfsp1=shiftposfs[p1];
+    if(shift || kgc)shiftposfsp1=shiftposfs[p1];
 
     //-Obtains data of particle p1 in case there are floating bodies.
     bool ftp1=false;       //-Indicates if it is floating. | Indica si es floating.
@@ -778,10 +786,10 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
       if(pfin){
                           KerInteractionForcesFluidBox<tker,ftmode,lamsps,tdensity,shift,false,kgc> (false,p1,pini,pfin,viscof,ftomassp,tauff,dengradcorr
                           ,poscell,velrhop,code,idp,CTE.massf,ftp1,pscellp1,velrhop1,pressp1,taup1_xx_xy,taup1_xz_yy,taup1_yz_zz,grap1_xx_xy,grap1_xz_yy,grap1_yz_zz
-                          ,acep1,arp1,visc,deltap1,shiftmode,shiftposfsp1,tkgc,kgcmat,kgcthreshold/*! DELETE THIS*/,gradpres/*! DELETE THIS*/);
+                          ,acep1,arp1,visc,deltap1,shiftmode,shiftposfsp1,kgcmat,kgcthreshold/*! DELETE THIS*/,gradpres/*! DELETE THIS*/);
         if(symm && rsymp1)KerInteractionForcesFluidBox<tker,ftmode,lamsps,tdensity,shift,true ,kgc> (false,p1,pini,pfin,viscof,ftomassp,tauff,dengradcorr
                           ,poscell,velrhop,code,idp,CTE.massf,ftp1,pscellp1,velrhop1,pressp1,taup1_xx_xy,taup1_xz_yy,taup1_yz_zz,grap1_xx_xy,grap1_xz_yy,grap1_yz_zz
-                          ,acep1,arp1,visc,deltap1,shiftmode,shiftposfsp1,tkgc,kgcmat,kgcthreshold/*! DELETE THIS*/,gradpres/*! DELETE THIS*/); //<vs_syymmetry>
+                          ,acep1,arp1,visc,deltap1,shiftmode,shiftposfsp1,kgcmat,kgcthreshold/*! DELETE THIS*/,gradpres/*! DELETE THIS*/); //<vs_syymmetry>
       }
     }
     //-Interaction with boundaries.
@@ -791,10 +799,10 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
       if(pfin){
                         KerInteractionForcesFluidBox<tker,ftmode,lamsps,tdensity,shift,false,kgc> (true ,p1,pini,pfin,viscob,ftomassp,tauff,NULL,poscell,velrhop,code,idp
                         ,CTE.massb,ftp1,pscellp1,velrhop1,pressp1,taup1_xx_xy,taup1_xz_yy,taup1_yz_zz,grap1_xx_xy,grap1_xz_yy,grap1_yz_zz,acep1,arp1,visc,deltap1
-                        ,shiftmode,shiftposfsp1,tkgc,kgcmat,kgcthreshold/*! DELETE THIS*/,gradpres/*! DELETE THIS*/);
+                        ,shiftmode,shiftposfsp1,kgcmat,kgcthreshold/*! DELETE THIS*/,gradpres/*! DELETE THIS*/);
       if(symm && rsymp1)KerInteractionForcesFluidBox<tker,ftmode,lamsps,tdensity,shift,true ,kgc> (true ,p1,pini,pfin,viscob,ftomassp,tauff,NULL,poscell,velrhop,code,idp
                         ,CTE.massb,ftp1,pscellp1,velrhop1,pressp1,taup1_xx_xy,taup1_xz_yy,taup1_yz_zz,grap1_xx_xy,grap1_xz_yy,grap1_yz_zz,acep1,arp1,visc,deltap1
-                        ,shiftmode,shiftposfsp1,tkgc,kgcmat,kgcthreshold/*! DELETE THIS*/,gradpres/*! DELETE THIS*/);
+                        ,shiftmode,shiftposfsp1,kgcmat,kgcthreshold/*! DELETE THIS*/,gradpres/*! DELETE THIS*/);
       }
     }
 
@@ -867,6 +875,7 @@ template<TpKernel tker,TpFtMode ftmode>
       }
     }
 
+    #if 0
     //-Interaction with boundaries.
     ini3-=cellfluid; fin3-=cellfluid;
     for(int c3=ini3;c3<fin3;c3+=nc.w)for(int c2=ini2;c2<fin2;c2+=nc.x){
@@ -888,7 +897,7 @@ template<TpKernel tker,TpFtMode ftmode>
 
             //-Compute matrix elements (symmetric)
             const float massrhop=massp2/velrhop[p2].w;
-            #if 1
+            #if 0
             if(CTE.tboundary==BC_MDBC){
               const float vfac=fac*massrhop;
               kgcmat[p1].xx-=drx*drx*vfac; kgcmat[p1].xy-=drx*dry*vfac; kgcmat[p1].xz-=drx*drz*vfac;
@@ -902,6 +911,7 @@ template<TpKernel tker,TpFtMode ftmode>
         }
       }
     }
+    #endif
   }
 }
 

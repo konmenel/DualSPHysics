@@ -718,12 +718,12 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
     tsymatrix3f bmat{1,0,0,1,0,1}; //< Unit Matrix (I)
     if(Simulate2D)bmat.yy=0;
     //-Bonet and Lok
-    if(kgc && !boundp2 && (TKgc==KGC_BonetLok || TKgc==KGC_BonetLokMinusOp) && shiftposfs[p1].w>KgcThreshold){
+    if(kgc && (TKgc==KGC_BonetLok || TKgc==KGC_BonetLokMinusOp) && kgcmat[p1].xx!=FLT_MAX){
       if(Simulate2D){
         const tsymatrix3f &kgcmatp1=kgcmat[p1];
-        const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
-        const tmatrix2f inv_a=fmath::InverseMatrix2x2(amat2d);
-        bmat=tsymatrix3f{inv_a.a11, 0.0f, inv_a.a12, 0.0f, 0.0f, inv_a.a22};
+        const tmatrix2f lmat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
+        const tmatrix2f inv_lmat=fmath::InverseMatrix2x2(lmat2d);
+        bmat=tsymatrix3f{inv_lmat.a11, 0.0f, inv_lmat.a12, 0.0f, 0.0f, inv_lmat.a22};
       }else{
         bmat=fmath::InverseMatrix3x3(kgcmat[p1]);
       }
@@ -769,15 +769,14 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
           if(rsym)velrhop2.y=-velrhop2.y; //<vs_syymmetry>
 
           //-Zago KGC
-          if(kgc && !boundp2 && !ftp2 &&(TKgc==KGC_Zago || TKgc==KGC_ZagoMinusOp) && shiftposfs[p1].w>KgcThreshold){
-            const tsymatrix3f amat=(kgcmat[p1]+kgcmat[p2])*0.5;
+          if(kgc && (TKgc==KGC_Zago || TKgc==KGC_ZagoMinusOp) && kgcmat[p1].xx!=FLT_MAX){
+            const tsymatrix3f lmat=(kgcmat[p1]+kgcmat[p2])*0.5;
             if(Simulate2D){
-              const tmatrix2f amat2d{amat.xx, amat.xz, amat.xz, amat.zz};
-              const float detamat=fmath::Determinant2x2(amat2d);
-              const tmatrix2f inv_a=fmath::InverseMatrix2x2(amat2d, detamat);
-              bmat=tsymatrix3f{inv_a.a11, 0.0f, inv_a.a12, 0.0f, 0.0f, inv_a.a22};
+              const tmatrix2f lmat2d{lmat.xx, lmat.xz, lmat.xz, lmat.zz};
+              const tmatrix2f inv_lmat=fmath::InverseMatrix2x2(lmat2d);
+              bmat=tsymatrix3f{inv_lmat.a11, 0.0f, inv_lmat.a12, 0.0f, 0.0f, inv_lmat.a22};
             }else{
-              bmat=fmath::InverseMatrix3x3(amat);
+              bmat=fmath::InverseMatrix3x3(lmat);
             }
           }
 
@@ -803,29 +802,27 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
             }
           }
           //! DELETE THIS
-          if(!boundp2){
-            const float prs=press[p2]-pressp1;
-            const float p_vpm=prs*massp2/velrhop2.w;
-            // const float p_vpm=1.0f*massp2/velrhop2.w; // Gradient of 1
-            float frxbar_=frx;
-            float frybar_=fry;
-            float frzbar_=frz;
-            if(kgc){
-              tsymatrix3f b{1,0,0,1,0,1}; //< Unit Matrix (I)
-              if(Simulate2D){
-                const tsymatrix3f &kgcmatp1=kgcmat[p1];
-                const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
-                const tmatrix2f &inv_a=fmath::InverseMatrix2x2(amat2d);
-                b=tsymatrix3f{inv_a.a11, 0.0f, inv_a.a12, 0.0f, 0.0f, inv_a.a22};
-              }else{
-                b=fmath::InverseMatrix3x3(kgcmat[p1]);
-              }
-              frxbar_=frx*b.xx+fry*b.xy+frz*b.xz;
-              frybar_=frx*b.xy+fry*b.yy+frz*b.yz;
-              frzbar_=frx*b.xz+fry*b.yz+frz*b.zz;
+          const float prs=(shiftposfsp1.w>KgcThreshold? press[p2]-pressp1: pressp1+press[p2]);
+          const float p_vpm=prs*massp2/velrhop2.w;
+          // const float p_vpm=1.0f*massp2/velrhop2.w; // Gradient of 1
+          float frxbar_=frx;
+          float frybar_=fry;
+          float frzbar_=frz;
+          if(kgc && kgcmat[p1].xx!=FLT_MAX){
+            tsymatrix3f b{1,0,0,1,0,1}; //< Unit Matrix (I)
+            if(Simulate2D){
+              const tsymatrix3f &kgcmatp1=kgcmat[p1];
+              const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
+              const tmatrix2f &inv_a=fmath::InverseMatrix2x2(amat2d);
+              b=tsymatrix3f{inv_a.a11, 0.0f, inv_a.a12, 0.0f, 0.0f, inv_a.a22};
+            }else{
+              b=fmath::InverseMatrix3x3(kgcmat[p1]);
             }
-            gradpresp1.x+=p_vpm*frxbar_; gradpresp1.y+=p_vpm*frybar_; gradpresp1.z+=p_vpm*frzbar_;
+            frxbar_=frx*b.xx+fry*b.xy+frz*b.xz;
+            frybar_=frx*b.xy+fry*b.yy+frz*b.yz;
+            frzbar_=frx*b.xz+fry*b.yz+frz*b.zz;
           }
+          gradpresp1.x+=p_vpm*frxbar_; gradpresp1.y+=p_vpm*frybar_; gradpresp1.z+=p_vpm*frzbar_;
           //! DELETE THIS
 
           //-Density derivative (Continuity equation).
@@ -859,7 +856,7 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
             shiftposfsp1.x=(noshift? FLT_MAX: shiftposfsp1.x+massrhop*frx); //-For boundary do not use shifting. | Con boundary anula shifting.
             shiftposfsp1.y+=massrhop*fry;
             shiftposfsp1.z+=massrhop*frz;
-            shiftposfsp1.w-=massrhop*(drx*frx+dry*fry+drz*frz);
+            if(!kgc)shiftposfsp1.w-=massrhop*(drx*frx+dry*fry+drz*frz);
           }
 
           //===== Viscosity ===== 
@@ -919,6 +916,7 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
       ace[p1]=ace[p1]+acep1;
       //! DELETE THIS
       gradpres[p1]=gradpres[p1]+gradpresp1;
+      gradpres[p1].y=shiftposfsp1.w;
       //! DELETE THIS
       const int th=omp_get_thread_num();
       if(visc>viscth[th*OMP_STRIDE])viscth[th*OMP_STRIDE]=visc;
@@ -1111,7 +1109,6 @@ void JSphCpu::ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos,const 
       }
     }
 
-    #if 0
     //--Boundary neighbors
     ngs=nsearch::Init(posp1,true,divdata);
     for(int z=ngs.zini;z<ngs.zfin;z++)for(int y=ngs.yini;y<ngs.yfin;y++){
@@ -1132,20 +1129,22 @@ void JSphCpu::ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos,const 
 
           //-Compute matrix elements (symmetric)
           const float massrhop=massp2/velrhop[p2].w;
-          #if 0
+          #ifdef _KGCBOUND
           if(TBoundary==BC_MDBC){
             const float vfac=fac*massrhop;
             kgcmat[p1].xx-=drx*drx*vfac; kgcmat[p1].xy-=drx*dry*vfac; kgcmat[p1].xz-=drx*drz*vfac;
                                          kgcmat[p1].yy-=dry*dry*vfac; kgcmat[p1].yz-=dry*drz*vfac;
                                                                       kgcmat[p1].zz-=drz*drz*vfac;
           }
+          #else
+          kgcmat[p1].xx=FLT_MAX;
           #endif
           //-For free surface detection (div(r))
           shiftposfs[p1].w-=massrhop*(drx*frx+dry*fry+drz*frz);
         }
       }
     }
-    #endif
+    if(shiftposfs[p1].w<KgcThreshold)kgcmat[p1].xx=FLT_MAX;
   }
 }
 

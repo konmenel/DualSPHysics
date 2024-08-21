@@ -60,6 +60,7 @@ typedef struct{
   unsigned symmetry;   //<vs_syymmetry>
   bool simulate2d;
   unsigned tkgc;
+  float kgcthreshold;
   unsigned tboundary;
   unsigned periactive;
   double xperincx,xperincy,xperincz;

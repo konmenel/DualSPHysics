@@ -152,6 +152,7 @@ int main(int argc, char** argv){
   //AppInfo.AddNameExtra("SaveFtAce");
   //AppInfo.AddNameExtra("SaveFtMotion");//<vs_ftmottionsv>
   AppInfo.AddNameExtra("KGC");
+  AppInfo.AddNameExtra(fun::PrintStr("Pres Gauge compilied at %s %s", __DATE__, __TIME__));
   #ifdef CODE_SIZE4
     AppInfo.AddNameExtra("MK65k");
   #endif

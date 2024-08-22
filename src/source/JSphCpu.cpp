@@ -769,7 +769,7 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
           if(rsym)velrhop2.y=-velrhop2.y; //<vs_syymmetry>
 
           //-Zago KGC
-          if(kgc && (TKgc==KGC_Zago || TKgc==KGC_ZagoMinusOp) && kgcmat[p1].xx!=FLT_MAX){
+          if(kgc && (TKgc==KGC_Zago || TKgc==KGC_ZagoMinusOp) && kgcmat[p1].xx!=FLT_MAX && kgcmat[p2].xx!=FLT_MAX){
             const tsymatrix3f lmat=(kgcmat[p1]+kgcmat[p2])*0.5;
             if(Simulate2D){
               const tmatrix2f lmat2d{lmat.xx, lmat.xz, lmat.xz, lmat.zz};

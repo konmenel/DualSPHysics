@@ -569,7 +569,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
       }
 
       //-Zago KGC
-      if(kgc && (CTE.tkgc==KGC_Zago || CTE.tkgc==KGC_ZagoMinusOp) && kgcmat[p1].xx!=FLT_MAX){
+      if(kgc && (CTE.tkgc==KGC_Zago || CTE.tkgc==KGC_ZagoMinusOp) && kgcmat[p1].xx!=FLT_MAX && kgcmat[p2].xx!=FLT_MAX){
         using cumath::AddMatrix3x3;
         using cumath::MulMatrix3x3;
         const tsymatrix3f lmat=MulMatrix3x3(AddMatrix3x3(kgcmat[p1],kgcmat[p2]),0.5); //< (Ai+Aj)/2

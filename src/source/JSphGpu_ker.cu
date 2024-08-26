@@ -523,17 +523,17 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
   ,const tsymatrix3f *kgcmat/*! DELETE THIS */,float3 *gradpres/*! DELETE THIS */)
 {
   //-Kernel Gradient Correction (KGC)
-  tsymatrix3f bmat{1,0,0,1,0,1}; //< Unit Matrix (I)
-  if(CTE.simulate2d)bmat.yy=0;
+  tsymatrix3f lmat{1,0,0,1,0,1}; //< Unit Matrix (I)
+  if(CTE.simulate2d)lmat.yy=0;
   //-Bonet and Lok KGC
   if(kgc && (CTE.tkgc==KGC_BonetLok || CTE.tkgc==KGC_BonetLokMinusOp) && kgcmat[p1].xx!=FLT_MAX){
     if(CTE.simulate2d){
       const tsymatrix3f &kgcmatp1=kgcmat[p1];
-      const tmatrix2f lmat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
-      const tmatrix2f inv_lmat=cumath::InverseMatrix2x2(lmat2d);
-      bmat=tsymatrix3f{inv_lmat.a11, 0.0f, inv_lmat.a12, 0.0f, 0.0f, inv_lmat.a22};
+      const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
+      const tmatrix2f lmat2d=cumath::InverseMatrix2x2(amat2d);
+      lmat=tsymatrix3f{lmat2d.a11, 0.0f, lmat2d.a12, 0.0f, 0.0f, lmat2d.a22};
     }else{
-      bmat=cumath::InverseMatrix3x3(kgcmat[p1]);
+      lmat=cumath::InverseMatrix3x3(kgcmat[p1]);
     }
   }
 
@@ -572,22 +572,22 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
       if(kgc && (CTE.tkgc==KGC_Zago || CTE.tkgc==KGC_ZagoMinusOp) && kgcmat[p1].xx!=FLT_MAX && kgcmat[p2].xx!=FLT_MAX){
         using cumath::AddMatrix3x3;
         using cumath::MulMatrix3x3;
-        const tsymatrix3f lmat=MulMatrix3x3(AddMatrix3x3(kgcmat[p1],kgcmat[p2]),0.5); //< (Ai+Aj)/2
+        const tsymatrix3f amat=MulMatrix3x3(AddMatrix3x3(kgcmat[p1],kgcmat[p2]),0.5); //< (Ai+Aj)/2
         if(CTE.simulate2d){
-          const tmatrix2f lmat2d{lmat.xx, lmat.xz, lmat.xz, lmat.zz};
-          const tmatrix2f inv_lmat=cumath::InverseMatrix2x2(lmat2d);
-          bmat=tsymatrix3f{inv_lmat.a11, 0.0f, inv_lmat.a12, 0.0f, 0.0f, inv_lmat.a22};
+          const tmatrix2f amat2d{amat.xx, amat.xz, amat.xz, amat.zz};
+          const tmatrix2f lmat2d=cumath::InverseMatrix2x2(amat2d);
+          lmat=tsymatrix3f{lmat2d.a11, 0.0f, lmat2d.a12, 0.0f, 0.0f, lmat2d.a22};
         }else{
-          bmat=cumath::InverseMatrix3x3(lmat);
+          lmat=cumath::InverseMatrix3x3(amat);
         }
       }
 
       //-Apply KGC only if either one was computed.
       if(kgc){
         //-Correct the gradient terms (frx_corr=B*frx)
-        frxbar=frx*bmat.xx+fry*bmat.xy+frz*bmat.xz;
-        frybar=frx*bmat.xy+fry*bmat.yy+frz*bmat.yz;
-        frzbar=frx*bmat.xz+fry*bmat.yz+frz*bmat.zz;
+        frxbar=frx*lmat.xx+fry*lmat.xy+frz*lmat.xz;
+        frybar=frx*lmat.xy+fry*lmat.yy+frz*lmat.yz;
+        frzbar=frx*lmat.xz+fry*lmat.yz+frz*lmat.zz;
       }
 
       float4 velrhop2=velrhop[p2];
@@ -597,7 +597,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
       if(compute){
         if(kgc && (CTE.tkgc==KGC_BonetLokMinusOp || CTE.tkgc==KGC_ZagoMinusOp)){
           const float pressp2=cufsph::ComputePressCte(velrhop2.w);
-          const float prs=(shiftposfsp1.w>CTE.kgcthreshold? pressp2-pressp1: pressp1+pressp2)/(velrhop1.w*velrhop2.w)
+          const float prs=(kgcmat[p1].xx!=FLT_MAX? pressp2-pressp1: pressp1+pressp2)/(velrhop1.w*velrhop2.w)
             +(tker==KERNEL_Cubic? cufsph::GetKernelCubic_Tensil(rr2,velrhop1.w,pressp1,velrhop2.w,pressp2): 0);
           const float p_vpm=-prs*(USE_FLOATING? ftmassp2: massp2);
           acep1.x+=p_vpm*frxbar; acep1.y+=p_vpm*frybar; acep1.z+=p_vpm*frzbar;

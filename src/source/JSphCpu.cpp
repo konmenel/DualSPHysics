@@ -715,17 +715,17 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
     const bool rsymp1=(Symmetry && posp1.y<=KernelSize); //<vs_syymmetry>
 
     //-Kernel Gradient Correction (KGC)
-    tsymatrix3f bmat{1,0,0,1,0,1}; //< Unit Matrix (I)
-    if(Simulate2D)bmat.yy=0;
+    tsymatrix3f lmat{1,0,0,1,0,1}; //< Unit Matrix (I)
+    if(Simulate2D)lmat.yy=0;
     //-Bonet and Lok
     if(kgc && (TKgc==KGC_BonetLok || TKgc==KGC_BonetLokMinusOp) && kgcmat[p1].xx!=FLT_MAX){
       if(Simulate2D){
         const tsymatrix3f &kgcmatp1=kgcmat[p1];
-        const tmatrix2f lmat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
-        const tmatrix2f inv_lmat=fmath::InverseMatrix2x2(lmat2d);
-        bmat=tsymatrix3f{inv_lmat.a11, 0.0f, inv_lmat.a12, 0.0f, 0.0f, inv_lmat.a22};
+        const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
+        const tmatrix2f lmat2d=fmath::InverseMatrix2x2(amat2d);
+        lmat=tsymatrix3f{lmat2d.a11, 0.0f, lmat2d.a12, 0.0f, 0.0f, lmat2d.a22};
       }else{
-        bmat=fmath::InverseMatrix3x3(kgcmat[p1]);
+        lmat=fmath::InverseMatrix3x3(kgcmat[p1]);
       }
     }
 
@@ -770,29 +770,29 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
 
           //-Zago KGC
           if(kgc && (TKgc==KGC_Zago || TKgc==KGC_ZagoMinusOp) && kgcmat[p1].xx!=FLT_MAX && kgcmat[p2].xx!=FLT_MAX){
-            const tsymatrix3f lmat=(kgcmat[p1]+kgcmat[p2])*0.5;
+            const tsymatrix3f amat=(kgcmat[p1]+kgcmat[p2])*0.5;
             if(Simulate2D){
-              const tmatrix2f lmat2d{lmat.xx, lmat.xz, lmat.xz, lmat.zz};
-              const tmatrix2f inv_lmat=fmath::InverseMatrix2x2(lmat2d);
-              bmat=tsymatrix3f{inv_lmat.a11, 0.0f, inv_lmat.a12, 0.0f, 0.0f, inv_lmat.a22};
+              const tmatrix2f amat2d{amat.xx, amat.xz, amat.xz, amat.zz};
+              const tmatrix2f lmat2d=fmath::InverseMatrix2x2(amat2d);
+              lmat=tsymatrix3f{lmat2d.a11, 0.0f, lmat2d.a12, 0.0f, 0.0f, lmat2d.a22};
             }else{
-              bmat=fmath::InverseMatrix3x3(lmat);
+              lmat=fmath::InverseMatrix3x3(amat);
             }
           }
 
           //-Apply KGC in gradient
           if(kgc){
             //-Correct the gradient terms (frx_corr=B*frx)
-            frxbar=frx*bmat.xx+fry*bmat.xy+frz*bmat.xz;
-            frybar=frx*bmat.xy+fry*bmat.yy+frz*bmat.yz;
-            frzbar=frx*bmat.xz+fry*bmat.yz+frz*bmat.zz;
+            frxbar=frx*lmat.xx+fry*lmat.xy+frz*lmat.xz;
+            frybar=frx*lmat.xy+fry*lmat.yy+frz*lmat.yz;
+            frzbar=frx*lmat.xz+fry*lmat.yz+frz*lmat.zz;
           }
 
           //-Velocity derivative (Momentum equation).
           if(compute){
             if(kgc && (TKgc==KGC_BonetLokMinusOp || TKgc==KGC_ZagoMinusOp)){
               const float prs_tensile=(tker==KERNEL_Cubic? fsph::GetKernelCubic_Tensil(CSP,rr2,rhopp1,pressp1,velrhop2.w,press[p2]): 0);
-              const float prs=(shiftposfsp1.w>KgcThreshold? press[p2]-pressp1: pressp1+press[p2])/(rhopp1*velrhop2.w) + prs_tensile;
+              const float prs=(kgcmat[p1].xx!=FLT_MAX? press[p2]-pressp1: pressp1+press[p2])/(rhopp1*velrhop2.w) + prs_tensile;
               const float p_vpm=-prs*massp2;
               acep1.x+=p_vpm*frxbar; acep1.y+=p_vpm*frybar; acep1.z+=p_vpm*frzbar;
             }else{

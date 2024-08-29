@@ -190,8 +190,9 @@ protected:
   float ViscoBoundFactor;     ///<For boundary interaction use Visco*ViscoBoundFactor.                  | Para interaccion con contorno usa Visco*ViscoBoundFactor.
   JDsViscoInput *ViscoTime;   ///<Provides a viscosity value as a function of simulation time.          | Proporciona un valor de viscosidad en funcion del instante de la simulacion.
 
-  TpKgc TKgc;                 ///<Kernel Correction type: 0:None, 1:Momentum... (default=0)
-  float KgcThreshold;         ///<Threshold KGC. I.e. det(0.5*(A_i+A_j)) > threshold (default=0.6)
+  TpKgc TKgc;                 ///<Kernel Correction type: 0:None, 1:Bonet and Lok... (default=0)
+  TpKgcFs TKgcFs;             ///<Kernel Correction Fs detection type: 0:NoBound, 1:Full (default=0)
+  float KgcThreshold;         ///<Threshold KGC, i.e div(r) > threshold (default=0)
 
   TpBoundary TBoundary;       ///<Boundary condition: DBC, M-DBC.
   TpSlipMode SlipMode;        ///<Slip mode for mDBC 1:DBC vel=0, 2:No-slip, 3:Free slip (default=1).
@@ -522,6 +523,7 @@ public:
   static std::string GetSlipName(TpSlipMode tslip);
   std::string GetDDTName(TpDensity tdensity)const;
   static std::string GetKGCName(TpKgc tkgc);
+  static std::string GetKGCFsName(TpKgcFs tkgcfs);
 
   std::string GetDDTConfig()const;
 

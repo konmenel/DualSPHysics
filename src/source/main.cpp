@@ -57,12 +57,6 @@ Please download source files and documentation from <a href="http://dual.sphysic
   #include "JSphGpuSingle.h"
 #endif
 
-#ifdef _KGCBOUND
-  #define KGCBOUND_STR "(Bound included)"
-#else
-  #define KGCBOUND_STR
-#endif
-
 #pragma warning(disable : 4996) //Cancels sprintf() deprecated.
 
 using namespace std;
@@ -157,7 +151,7 @@ int main(int argc, char** argv){
   //AppInfo.AddNameExtra("Symmetry");    //<vs_syymmetry>
   //AppInfo.AddNameExtra("SaveFtAce");
   //AppInfo.AddNameExtra("SaveFtMotion");//<vs_ftmottionsv>
-  AppInfo.AddNameExtra("KGC" KGCBOUND_STR);
+  AppInfo.AddNameExtra("KGC");
   AppInfo.AddNameExtra(fun::PrintStr("Pres Gauge compilied at %s %s", __DATE__, __TIME__));
   #ifdef CODE_SIZE4
     AppInfo.AddNameExtra("MK65k");

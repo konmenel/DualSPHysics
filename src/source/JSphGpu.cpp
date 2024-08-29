@@ -581,6 +581,7 @@ void JSphGpu::ConstantDataUp(){
   ctes.symmetry=Symmetry;   //<vs_syymmetry>
   ctes.simulate2d=Simulate2D;
   ctes.tkgc=unsigned(TKgc);
+  ctes.tkgcfs=unsigned(TKgcFs);
   ctes.kgcthreshold=KgcThreshold;
   ctes.tboundary=unsigned(TBoundary);
   ctes.periactive=PeriActive;
@@ -870,7 +871,7 @@ void JSphGpu::PreInteractionVars_Forces(unsigned np,unsigned npb){
   cudaMemset(Aceg,0,sizeof(tfloat3)*np);                                 //Aceg[]=(0,0,0)
   if(SpsGradvelg)cudaMemset(SpsGradvelg+npb,0,sizeof(tsymatrix3f)*npf);  //SpsGradvelg[]=(0,0,0,0,0,0).
   if(KgcMatg)cudaMemset(KgcMatg+npb,0,sizeof(tsymatrix3f)*npf);          //KgcMatc[]=(0,0,0,0,0,0).
-  if(ShiftPosfsg)cudaMemset(ShiftPosfsg+npb,0,sizeof(float4)*npf);  //ShiftPosfsg[]=(0,0,0,0).
+  if(ShiftPosfsg)cudaMemset(ShiftPosfsg+npb,0,sizeof(float4)*npf);       //ShiftPosfsg[]=(0,0,0,0).
   //! DETELE THIS
   cudaMemset(GradPresg+npb,0,sizeof(tfloat3)*npf);
   //! DETELE THIS
@@ -893,7 +894,7 @@ void JSphGpu::PreInteraction_Forces(){
   Arg=ArraysGpu->ReserveFloat();
   Aceg=ArraysGpu->ReserveFloat3();
   if(DDTArray)Deltag=ArraysGpu->ReserveFloat();
-  if(Shifting || TKgc!=KGC_None)ShiftPosfsg=ArraysGpu->ReserveFloat4();
+  if(Shifting)ShiftPosfsg=ArraysGpu->ReserveFloat4();
   if(TVisco==VISCO_LaminarSPS)SpsGradvelg=ArraysGpu->ReserveSymatrix3f();
   if(TKgc!=KGC_None)KgcMatg=ArraysGpu->ReserveSymatrix3f();
 

@@ -177,6 +177,7 @@ void JSph::InitVars(){
   DDTRamp=TDouble3(0); //<vs_ddramp>
   ShiftingMode=(Shifting? Shifting->GetShiftMode(): SHIFT_None);
   TKgc=KGC_None;
+  TKgcFs=KGC_NoBound;
   KgcThreshold=0.6;
   Visco=0; ViscoBoundFactor=1;
   TBoundary=BC_DBC;
@@ -698,6 +699,11 @@ void JSph::LoadConfigParameters(const JXml *xml){
   }
   if(TKgc!=KGC_None){
     KgcThreshold=eparms.GetValueFloat("KgcTFS",true,0);
+    switch(eparms.GetValueInt("KgcFsType",true,0)){
+      case 0:  TKgcFs=KGC_NoBound;     break;
+      case 1:  TKgcFs=KGC_Full;        break;
+      default: Run_ExceptioonFile("KgcFsType mode in <execution><parameters> is not valid.",FileXml);
+    }
   }
 
   WrnPartsOut=(eparms.GetValueInt("WrnPartsOut",true,1)!=0);
@@ -862,14 +868,16 @@ void JSph::LoadConfigCommands(const JSphCfgRun *cfg){
       default: Run_ExceptioonFile("KernelGradCorrection mode is not valid.",FileXml);
     }
   }
-  if(TKgc!=KGC_None && cfg->KgcThreshold!=FLT_MAX){
-    if(Simulate2D){
-      Log->PrintWarning("Kernel Gradient Correction is only supported for 3D simulations.");
-    }else{
-      KgcThreshold=cfg->KgcThreshold;
+  if(cfg->TKgcFs>=0){
+      switch(cfg->TKgcFs){
+      case 0:  TKgcFs=KGC_NoBound;     break;
+      case 1:  TKgcFs=KGC_Full;  break;
+      default: Run_ExceptioonFile("KgcFs mode is not valid.",FileXml);
     }
   }
-
+  if(TKgc!=KGC_None && cfg->KgcThreshold!=FLT_MAX){
+      KgcThreshold=cfg->KgcThreshold;
+  }
   if(cfg->CFLnumber>0)CFLnumber=cfg->CFLnumber;
   if(cfg->FtPause>=0)FtPause=cfg->FtPause;
   if(cfg->TimeMax>0)TimeMax=cfg->TimeMax;
@@ -1580,6 +1588,7 @@ void JSph::VisuConfig(){
   //-Kernel Gradient Correction.
   if(TKgc!=KGC_None){
     Log->Print(fun::VarStr("KernelGradCorrection",GetKGCName(TKgc)));
+    Log->Print(fun::VarStr("   KgcFsType",GetKGCFsName(TKgcFs)));
     Log->Print(fun::VarStr("   KGCthreshhold",KgcThreshold));
   }
   else Log->Print(fun::VarStr("KernelGradCorrection","None"));
@@ -3159,8 +3168,7 @@ std::string JSph::GetDDTName(TpDensity tdensity)const{
 }
 
 //==============================================================================
-/// Returns name of Density Diffusion Term in text format.
-/// Devuelve nombre del Density Diffusion Term en texto.
+/// Returns name of Kernel Gradient Correction in text format.
 //==============================================================================
 std::string JSph::GetKGCName(TpKgc tkgc){
   string tx;
@@ -3170,6 +3178,19 @@ std::string JSph::GetKGCName(TpKgc tkgc){
     case KGC_Zago:            tx="Zago et al"; break;
     case KGC_BonetLokMinusOp: tx="Bonet and Lok minus operator"; break;
     case KGC_ZagoMinusOp:     tx="Zago et al minus operator"; break;
+    default:                  tx="???";
+  }
+  return(tx);
+}
+
+//==============================================================================
+/// Returns name of Kernel Gradient Correction Free Surface term in text format.
+//==============================================================================
+std::string JSph::GetKGCFsName(TpKgcFs tkgcfs){
+  string tx;
+  switch(tkgcfs){
+    case KGC_NoBound:            tx="NoBound"; break;
+    case KGC_Full:        tx="Full"; break;
     default:                  tx="???";
   }
   return(tx);

@@ -58,6 +58,7 @@ void JSphCfgRun::Reset(){
   DDTValueTRamp=DDTValueTMax=DDTValueMax=0;  //<vs_ddramp>
   Shifting=-1;
   TKgc=-1;
+  TKgcFs=-1;
   KgcThreshold=FLT_MAX;
   Sv_Binx=true; 
   Sv_Info=true;
@@ -157,10 +158,15 @@ void JSphCfgRun::VisuInfo()const{
   printf("        full       Shifting is always applied\n");
   printf("\n");
   printf("    -kgc:<mode> Specifies the use of Kernel Gradient correction\n");
-  printf("        0          KGC is disabled (by default)\n");
-  printf("        1          KGC applied in momentum equation\n");
-  printf("        2          Particle symmetric KGC applied in momentum equation\n");
-  printf("    -kgcthreshold:<float> The threshold for the determinant of the correction matrix (0.6 by default)\n");
+  printf("        0    KGC is disabled (by default)\n");
+  printf("        1    Bonet and Lok\n");
+  printf("        2    Zago et al.\n");
+  printf("        3    Bonet and Lok minus operator at ointerior\n");
+  printf("        4    Zago et al. minus operator at ointerior\n");
+  printf("    -kgcfs:<mode> Specifies KGC will include boundaries (only with mDBC)\n");
+  printf("        0    NoBound (by default)\n");
+  printf("        1    Full\n");
+  printf("    -kgcthreshold:<float> The free surface threshold, i.e. div(r) (0 by default)\n");
   printf("\n");
 
   printf("  Simulation options:\n");
@@ -247,6 +253,7 @@ void JSphCfgRun::VisuConfig()const{
   fun::PrintVar("  DDTValue",DDTValue,ln);
   fun::PrintVar("  Shifting",Shifting,ln);
   fun::PrintVar("  TKgc",TKgc,ln);
+  fun::PrintVar("  TKgcFs",TKgcFs,ln);
   fun::PrintVar("  KGCThreshold",KgcThreshold,ln);
   fun::PrintVar("  SvRes",SvRes,ln);
   fun::PrintVar("  SvTimers",SvTimers,ln);
@@ -374,6 +381,13 @@ void JSphCfgRun::LoadOpts(string *optlis,int optn,int lv,const std::string &file
       else if(txword=="KGC"){
         TKgc=atoi(txoptfull.c_str()); 
         if(TKgc<0 || TKgc>4)ErrorParm(opt,c,lv,file);
+      }
+      else if(txword=="KGCFS"){
+        TKgcFs=atoi(txoptfull.c_str()); 
+        if(TKgcFs<0 || TKgcFs>1)ErrorParm(opt,c,lv,file);
+      }
+      else if(txword=="KGCTHRESHOLD"){
+        KgcThreshold=atof(txoptfull.c_str());
       }
       else if(txword=="SVNORMALS")SvNormals=(txoptfull!=""? atoi(txoptfull.c_str()): 1)!=0;
       else if(txword=="SVRES")SvRes=(txoptfull!=""? atoi(txoptfull.c_str()): 1)!=0;

@@ -378,6 +378,12 @@ typedef enum{
   KGC_ZagoMinusOp=4       ///<KGC from Zago et al with minus operator in the interior and plus on the free surface.
 }TpKgc;
 
+///Types for Kernel Gradient Correction Free Surface detection. Boundaries can be included only for mDCB.
+typedef enum{
+  KGC_Full=1,             ///<KGC is applied to all fluid particles.
+  KGC_NoBound=0,          ///<KGC is applied to fluid particles except those that interact with all boundaries.
+}TpKgcFs; 
+
 ///Structure with main SPH constants and configurations.
 typedef struct{
   bool simulate2d;          ///<Toggles 2D simulation (cancels forces in Y axis).

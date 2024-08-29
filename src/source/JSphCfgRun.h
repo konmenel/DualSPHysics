@@ -67,8 +67,9 @@ public:
   double DDTValueTMax;   ///<Time of maximum DDT value (default=0)                 //<vs_ddramp>
   double DDTValueMax;    ///<Maximum DDT value for initial ramp (default=0)        //<vs_ddramp>
   int Shifting;   ///<Shifting mode -1:no defined, 0:none, 1:nobound, 2:nofixed, 3:full
-  int TKgc;              ///<Kernel Gradient Correction 0:None 1:Momentum Eq 2:Symmetric Momentum Eq
-  float KgcThreshold;   ///<KGC threshold on det(Ai)
+  int TKgc;                   ///<Kernel Correction type: 0:None, 1:Bonet and Lok... (default=0)
+  int TKgcFs;                 ///<Kernel Correction Fs detection type: 0:NoBound, 1:Full (default=0)
+  float KgcThreshold;         ///<Threshold KGC, i.e div(r) > threshold (default=0)
   bool Sv_Binx,Sv_Info,Sv_Csv,Sv_Vtk;
   bool SvNormals; ///<Saves normals VTK each PART (default=0).
   bool SvRes;

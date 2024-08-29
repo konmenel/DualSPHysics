@@ -640,7 +640,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
         shiftposfsp1.x=(noshift? FLT_MAX: shiftposfsp1.x+massrhop*frx); //-Removes shifting for the boundaries. | Con boundary anula shifting.
         shiftposfsp1.y+=massrhop*fry;
         shiftposfsp1.z+=massrhop*frz;
-        if(!kgc)shiftposfsp1.w-=massrhop*dot3;
+        shiftposfsp1.w-=massrhop*dot3;
       }
 
       //===== Viscosity ===== 
@@ -688,7 +688,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
       }
       //! DELETE THIS
       const float pressp2=cufsph::ComputePressCte(velrhop2.w);
-      const float prs=(shiftposfsp1.w>CTE.kgcthreshold? pressp2-pressp1: pressp1+pressp2);
+      const float prs=(kgcmat[p1].xx!=FLT_MAX? pressp2-pressp1: pressp1+pressp2);
       const float p_vpm=prs*massp2/velrhop2.w;
       float frxbar_=frx;
       float frybar_=fry;
@@ -708,7 +708,6 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
         frzbar_=frx*b.xz+fry*b.yz+frz*b.zz;
       }
       gradpres[p1].x+=p_vpm*frxbar_; gradpres[p1].y+=p_vpm*frybar_; gradpres[p1].z+=p_vpm*frzbar_;
-      gradpres[p1].y=shiftposfsp1.w;
       //! DELETE THIS
     }
   }
@@ -738,7 +737,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
 
     //-Variables for Shifting.
     float4 shiftposfsp1;
-    if(shift || kgc)shiftposfsp1=shiftposfs[p1];
+    if(shift)shiftposfsp1=shiftposfs[p1];
 
     //-Obtains data of particle p1 in case there are floating bodies.
     bool ftp1=false;       //-Indicates if it is floating. | Indica si es floating.
@@ -828,10 +827,11 @@ template<TpKernel tker,TpFtMode ftmode>
   __global__ void KerComputeKgcMat(unsigned n,unsigned pinit,int scelldiv,int4 nc
   ,int3 cellzero,const int2 *begincell,unsigned cellfluid,const unsigned *dcell
   ,const float4 *poscell,const float4 *velrhop,const typecode *code,const float *ftomassp
-  ,float4 *shiftposfs,tsymatrix3f *kgcmat)
+  ,tsymatrix3f *kgcmat)
 {
   const unsigned p=blockIdx.x*blockDim.x + threadIdx.x; //-Number of particle.
   if(p<n){
+    float fsp1=0;
     const unsigned p1=p+pinit;      //-Number of particle.
 
     //-Obtains basic data of particle p1.
@@ -864,7 +864,7 @@ template<TpKernel tker,TpFtMode ftmode>
                                          kgcmat[p1].yy-=dry*dry*vfac; kgcmat[p1].yz-=dry*drz*vfac;
                                                                       kgcmat[p1].zz-=drz*drz*vfac;
             //-For free surface detection (div(r))
-            shiftposfs[p1].w-=massrhop*(drx*frx+dry*fry+drz*frz);
+            fsp1-=massrhop*(drx*frx+dry*fry+drz*frz);
           }
         }
       }
@@ -891,23 +891,21 @@ template<TpKernel tker,TpFtMode ftmode>
 
             //-Compute matrix elements (symmetric)
             const float massrhop=massp2/velrhop[p2].w;
-            #ifdef _KGCBOUND
-            if(CTE.tboundary==BC_MDBC){
+            if(CTE.tkgcfs==KGC_Full && CTE.tboundary==BC_MDBC){
               const float vfac=fac*massrhop;
               kgcmat[p1].xx-=drx*drx*vfac; kgcmat[p1].xy-=drx*dry*vfac; kgcmat[p1].xz-=drx*drz*vfac;
                                            kgcmat[p1].yy-=dry*dry*vfac; kgcmat[p1].yz-=dry*drz*vfac;
                                                                         kgcmat[p1].zz-=drz*drz*vfac;
+            }else{
+              kgcmat[p1].xx=FLT_MAX;
             }
-            #else
-            kgcmat[p1].xx=FLT_MAX;
-            #endif
             //-For free surface detection (div(r))
-            shiftposfs[p1].w-=massrhop*(drx*frx+dry*fry+drz*frz);
+            fsp1-=massrhop*(drx*frx+dry*fry+drz*frz);
           }
         }
       }
     }
-    if(shiftposfs[p1].w<CTE.kgcthreshold)kgcmat[p1].xx=FLT_MAX;
+    if(fsp1<CTE.kgcthreshold)kgcmat[p1].xx=FLT_MAX;
   }
 }
 
@@ -970,7 +968,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
     dim3 sgridf=GetSimpleGridSize(t.fluidnum,t.bsfluid);
 
     if(kgc)KerComputeKgcMat<tker,ftmode> <<<sgridf,t.bsfluid,0,t.stm>>>(t.fluidnum,t.fluidini,dvd.scelldiv,dvd.nc,dvd.cellzero
-      ,dvd.beginendcell,dvd.cellfluid,t.dcell,t.poscell,t.velrhop,t.code,t.ftomassp,t.shiftposfs,t.kgcmat);
+      ,dvd.beginendcell,dvd.cellfluid,t.dcell,t.poscell,t.velrhop,t.code,t.ftomassp,t.kgcmat);
     
     if(t.symmetry){ //<vs_syymmetry_ini>
       KerInteractionForcesFluid<tker,ftmode,lamsps,tdensity,shift,true,kgc> <<<sgridf,t.bsfluid,0,t.stm>>> 

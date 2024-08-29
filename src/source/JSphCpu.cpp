@@ -182,7 +182,7 @@ void JSphCpu::AllocCpuMemoryParticles(unsigned np,float over){
   if(TKgc!=KGC_None){     
     ArraysCpu->AddArrayCount(JArraysCpu::SIZE_24B,1); //-KgcMat
   }
-  if(Shifting || TKgc!=KGC_None){
+  if(Shifting){
     ArraysCpu->AddArrayCount(JArraysCpu::SIZE_16B,1); //-shiftposfs
   }
   if(UseNormals){
@@ -466,7 +466,7 @@ void JSphCpu::PreInteractionVars_Forces(unsigned np,unsigned npb){
   memset(Acec,0,sizeof(tfloat3)*np);                                 //Acec[]=(0,0,0)
   if(SpsGradvelc)memset(SpsGradvelc+npb,0,sizeof(tsymatrix3f)*npf);  //SpsGradvelc[]=(0,0,0,0,0,0).
   if(KgcMatc)memset(KgcMatc+npb,0,sizeof(tsymatrix3f)*npf);          //KgcMatc[]=(0,0,0,0,0,0).
-  if(ShiftPosfsc)memset(ShiftPosfsc+npb,0,sizeof(tfloat4)*npf);  //ShiftPosfsc[]=(0,0,0,0).
+  if(ShiftPosfsc)memset(ShiftPosfsc+npb,0,sizeof(tfloat4)*npf);      //ShiftPosfsc[]=(0,0,0,0).
   //! DETELE THIS
   memset(GradPresc+npb,0,sizeof(tfloat3)*npf);
   //! DETELE THIS
@@ -497,7 +497,7 @@ void JSphCpu::PreInteraction_Forces(){
   Arc=ArraysCpu->ReserveFloat();
   Acec=ArraysCpu->ReserveFloat3();
   if(DDTArray)Deltac=ArraysCpu->ReserveFloat();
-  if(Shifting || TKgc!=KGC_None)ShiftPosfsc=ArraysCpu->ReserveFloat4();
+  if(Shifting)ShiftPosfsc=ArraysCpu->ReserveFloat4();
   Pressc=ArraysCpu->ReserveFloat();
   if(TVisco==VISCO_LaminarSPS)SpsGradvelc=ArraysCpu->ReserveSymatrix3f();
   if(TKgc!=KGC_None)KgcMatc=ArraysCpu->ReserveSymatrix3f();
@@ -696,7 +696,7 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
 
     //-Variables for Shifting.
     tfloat4 shiftposfsp1;
-    if(shift || kgc)shiftposfsp1=shiftposfs[p1];
+    if(shift)shiftposfsp1=shiftposfs[p1];
 
     //-Obtain data of particle p1 in case of floating objects. | Obtiene datos de particula p1 en caso de existir floatings.
     bool ftp1=false;     //-Indicate if it is floating. | Indica si es floating.
@@ -802,7 +802,7 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
             }
           }
           //! DELETE THIS
-          const float prs=(shiftposfsp1.w>KgcThreshold? press[p2]-pressp1: pressp1+press[p2]);
+          const float prs=(kgcmat[p1].xx!=FLT_MAX? press[p2]-pressp1: pressp1+press[p2]);
           const float p_vpm=prs*massp2/velrhop2.w;
           // const float p_vpm=1.0f*massp2/velrhop2.w; // Gradient of 1
           float frxbar_=frx;
@@ -856,7 +856,7 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
             shiftposfsp1.x=(noshift? FLT_MAX: shiftposfsp1.x+massrhop*frx); //-For boundary do not use shifting. | Con boundary anula shifting.
             shiftposfsp1.y+=massrhop*fry;
             shiftposfsp1.z+=massrhop*frz;
-            if(!kgc)shiftposfsp1.w-=massrhop*(drx*frx+dry*fry+drz*frz);
+            shiftposfsp1.w-=massrhop*(drx*frx+dry*fry+drz*frz);
           }
 
           //===== Viscosity ===== 
@@ -916,7 +916,6 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
       ace[p1]=ace[p1]+acep1;
       //! DELETE THIS
       gradpres[p1]=gradpres[p1]+gradpresp1;
-      gradpres[p1].y=shiftposfsp1.w;
       //! DELETE THIS
       const int th=omp_get_thread_num();
       if(visc>viscth[th*OMP_STRIDE])viscth[th*OMP_STRIDE]=visc;
@@ -1072,12 +1071,13 @@ void JSphCpu::ComputeSpsTau(unsigned n,unsigned pini,const tfloat4 *velrhop,cons
 //==============================================================================
 template<TpKernel tker,TpFtMode ftmode>
 void JSphCpu::ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos,const tfloat4 *velrhop
-  ,const StDivDataCpu& divdata,const unsigned *dcell,const typecode *code,tfloat4 *shiftposfs,tsymatrix3f *kgcmat)const{
+  ,const StDivDataCpu& divdata,const unsigned *dcell,const typecode *code,tsymatrix3f *kgcmat)const{
   const int pfin=int(pini+n);
   #ifdef OMP_USE
     #pragma omp parallel for schedule (static)
   #endif
   for(int p1=int(pini);p1<pfin;p1++){
+    float fsp1=0;
     //-Obtain data of particle p1.
     const tdouble3 posp1=pos[p1];
 
@@ -1104,7 +1104,7 @@ void JSphCpu::ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos,const 
                                        kgcmat[p1].yy-=dry*dry*vfac; kgcmat[p1].yz-=dry*drz*vfac;
                                                                     kgcmat[p1].zz-=drz*drz*vfac;
           //-For free surface detection (div(r))
-          shiftposfs[p1].w-=massrhop*(drx*frx+dry*fry+drz*frz);
+          fsp1-=massrhop*(drx*frx+dry*fry+drz*frz);
         }
       }
     }
@@ -1129,22 +1129,20 @@ void JSphCpu::ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos,const 
 
           //-Compute matrix elements (symmetric)
           const float massrhop=massp2/velrhop[p2].w;
-          #ifdef _KGCBOUND
-          if(TBoundary==BC_MDBC){
+          if(TKgcFs==KGC_Full && TBoundary==BC_MDBC){
             const float vfac=fac*massrhop;
             kgcmat[p1].xx-=drx*drx*vfac; kgcmat[p1].xy-=drx*dry*vfac; kgcmat[p1].xz-=drx*drz*vfac;
                                          kgcmat[p1].yy-=dry*dry*vfac; kgcmat[p1].yz-=dry*drz*vfac;
                                                                       kgcmat[p1].zz-=drz*drz*vfac;
+          }else{
+            kgcmat[p1].xx=FLT_MAX;
           }
-          #else
-          kgcmat[p1].xx=FLT_MAX;
-          #endif
           //-For free surface detection (div(r))
-          shiftposfs[p1].w-=massrhop*(drx*frx+dry*fry+drz*frz);
+          fsp1-=massrhop*(drx*frx+dry*fry+drz*frz);
         }
       }
     }
-    if(shiftposfs[p1].w<KgcThreshold)kgcmat[p1].xx=FLT_MAX;
+    if(fsp1<KgcThreshold)kgcmat[p1].xx=FLT_MAX;
   }
 }
 
@@ -1157,7 +1155,7 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
 {
   float viscdt=res.viscdt;
   if(t.npf){
-    if(kgc)ComputeKgcMat<tker,ftmode>(t.npf,t.npb,t.pos,t.velrhop,t.divdata,t.dcell,t.code,t.shiftposfs,t.kgcmat);
+    if(kgc)ComputeKgcMat<tker,ftmode>(t.npf,t.npb,t.pos,t.velrhop,t.divdata,t.dcell,t.code,t.kgcmat);
 
     //-Interaction Fluid-Fluid.
     InteractionForcesFluid<tker,ftmode,tvisco,tdensity,shift,kgc> (t.npf,t.npb,false,Visco                 

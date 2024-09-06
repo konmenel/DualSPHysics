@@ -719,14 +719,15 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
     if(Simulate2D)lmat.yy=0;
     //-Bonet and Lok
     if(kgc && (TKgc==KGC_BonetLok || TKgc==KGC_BonetLokMinusOp) && kgcmat[p1].xx!=FLT_MAX){
-      if(Simulate2D){
-        const tsymatrix3f &kgcmatp1=kgcmat[p1];
-        const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
-        const tmatrix2f lmat2d=fmath::InverseMatrix2x2(amat2d);
-        lmat=tsymatrix3f{lmat2d.a11, 0.0f, lmat2d.a12, 0.0f, 0.0f, lmat2d.a22};
-      }else{
-        lmat=fmath::InverseMatrix3x3(kgcmat[p1]);
-      }
+      // if(Simulate2D){
+      //   const tsymatrix3f &kgcmatp1=kgcmat[p1];
+      //   const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
+      //   const tmatrix2f lmat2d=fmath::InverseMatrix2x2(amat2d);
+      //   lmat=tsymatrix3f{lmat2d.a11, 0.0f, lmat2d.a12, 0.0f, 0.0f, lmat2d.a22};
+      // }else{
+      //   lmat=fmath::InverseMatrix3x3(kgcmat[p1]);
+      // }
+      lmat=kgcmat[p1];
     }
 
     //-Search for neighbours in adjacent cells.
@@ -770,14 +771,15 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
 
           //-Zago KGC
           if(kgc && (TKgc==KGC_Zago || TKgc==KGC_ZagoMinusOp) && kgcmat[p1].xx!=FLT_MAX && kgcmat[p2].xx!=FLT_MAX){
-            const tsymatrix3f amat=(kgcmat[p1]+kgcmat[p2])*0.5;
-            if(Simulate2D){
-              const tmatrix2f amat2d{amat.xx, amat.xz, amat.xz, amat.zz};
-              const tmatrix2f lmat2d=fmath::InverseMatrix2x2(amat2d);
-              lmat=tsymatrix3f{lmat2d.a11, 0.0f, lmat2d.a12, 0.0f, 0.0f, lmat2d.a22};
-            }else{
-              lmat=fmath::InverseMatrix3x3(amat);
-            }
+            // const tsymatrix3f amat=(kgcmat[p1]+kgcmat[p2])*0.5;
+            // if(Simulate2D){
+            //   const tmatrix2f amat2d{amat.xx, amat.xz, amat.xz, amat.zz};
+            //   const tmatrix2f lmat2d=fmath::InverseMatrix2x2(amat2d);
+            //   lmat=tsymatrix3f{lmat2d.a11, 0.0f, lmat2d.a12, 0.0f, 0.0f, lmat2d.a22};
+            // }else{
+            //   lmat=fmath::InverseMatrix3x3(amat);
+            // }
+            lmat=(kgcmat[p1]+kgcmat[p2])*0.5;
           }
 
           //-Apply KGC in gradient
@@ -1142,7 +1144,17 @@ void JSphCpu::ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos,const 
         }
       }
     }
-    if(fsp1<KgcThreshold)kgcmat[p1].xx=FLT_MAX;
+    if(fsp1<KgcThreshold){
+      kgcmat[p1].xx=FLT_MAX;
+    }else if(kgcmat[p1].xx!=FLT_MAX){
+      if(Simulate2D){
+        //  kgcmat2d{kgcmat[p1].xx, kgcmat[p1].xz, kgcmat[p1].xz, kgcmat[p1].zz};
+        const tmatrix2f kgcmat2d=fmath::InverseMatrix2x2(tmatrix2f{kgcmat[p1].xx, kgcmat[p1].xz, kgcmat[p1].xz, kgcmat[p1].zz});
+        kgcmat[p1]=tsymatrix3f{kgcmat2d.a11, 0.0f, kgcmat2d.a12, 0.0f, 0.0f, kgcmat2d.a22};
+      }else{
+        kgcmat[p1]=fmath::InverseMatrix3x3(kgcmat[p1]);
+      }
+    }
   }
 }
 

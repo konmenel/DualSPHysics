@@ -527,14 +527,15 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
   if(CTE.simulate2d)lmat.yy=0;
   //-Bonet and Lok KGC
   if(kgc && (CTE.tkgc==KGC_BonetLok || CTE.tkgc==KGC_BonetLokMinusOp) && kgcmat[p1].xx!=FLT_MAX){
-    if(CTE.simulate2d){
-      const tsymatrix3f &kgcmatp1=kgcmat[p1];
-      const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
-      const tmatrix2f lmat2d=cumath::InverseMatrix2x2(amat2d);
-      lmat=tsymatrix3f{lmat2d.a11, 0.0f, lmat2d.a12, 0.0f, 0.0f, lmat2d.a22};
-    }else{
-      lmat=cumath::InverseMatrix3x3(kgcmat[p1]);
-    }
+    // if(CTE.simulate2d){
+    //   const tsymatrix3f &kgcmatp1=kgcmat[p1];
+    //   const tmatrix2f amat2d{kgcmatp1.xx, kgcmatp1.xz, kgcmatp1.xz, kgcmatp1.zz};
+    //   const tmatrix2f lmat2d=cumath::InverseMatrix2x2(amat2d);
+    //   lmat=tsymatrix3f{lmat2d.a11, 0.0f, lmat2d.a12, 0.0f, 0.0f, lmat2d.a22};
+    // }else{
+    //   lmat=cumath::InverseMatrix3x3(kgcmat[p1]);
+    // }
+    lmat=kgcmat[p1];
   }
 
   for(int p2=pini;p2<pfin;p2++){
@@ -572,14 +573,15 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
       if(kgc && (CTE.tkgc==KGC_Zago || CTE.tkgc==KGC_ZagoMinusOp) && kgcmat[p1].xx!=FLT_MAX && kgcmat[p2].xx!=FLT_MAX){
         using cumath::AddMatrix3x3;
         using cumath::MulMatrix3x3;
-        const tsymatrix3f amat=MulMatrix3x3(AddMatrix3x3(kgcmat[p1],kgcmat[p2]),0.5); //< (Ai+Aj)/2
-        if(CTE.simulate2d){
-          const tmatrix2f amat2d{amat.xx, amat.xz, amat.xz, amat.zz};
-          const tmatrix2f lmat2d=cumath::InverseMatrix2x2(amat2d);
-          lmat=tsymatrix3f{lmat2d.a11, 0.0f, lmat2d.a12, 0.0f, 0.0f, lmat2d.a22};
-        }else{
-          lmat=cumath::InverseMatrix3x3(amat);
-        }
+        // const tsymatrix3f amat=MulMatrix3x3(AddMatrix3x3(kgcmat[p1],kgcmat[p2]),0.5); //< (Ai+Aj)/2
+        // if(CTE.simulate2d){
+        //   const tmatrix2f amat2d{amat.xx, amat.xz, amat.xz, amat.zz};
+        //   const tmatrix2f lmat2d=cumath::InverseMatrix2x2(amat2d);
+        //   lmat=tsymatrix3f{lmat2d.a11, 0.0f, lmat2d.a12, 0.0f, 0.0f, lmat2d.a22};
+        // }else{
+        //   lmat=cumath::InverseMatrix3x3(amat);
+        // }
+        lmat=MulMatrix3x3(AddMatrix3x3(kgcmat[p1],kgcmat[p2]),0.5);
       }
 
       //-Apply KGC only if either one was computed.
@@ -905,7 +907,17 @@ template<TpKernel tker,TpFtMode ftmode>
         }
       }
     }
-    if(fsp1<CTE.kgcthreshold)kgcmat[p1].xx=FLT_MAX;
+    if(fsp1<CTE.kgcthreshold){
+      kgcmat[p1].xx=FLT_MAX;
+    }else if(kgcmat[p1].xx!=FLT_MAX){
+      if(CTE.simulate2d){
+        //  kgcmat2d{kgcmat[p1].xx, kgcmat[p1].xz, kgcmat[p1].xz, kgcmat[p1].zz};
+        const tmatrix2f kgcmat2d=cumath::InverseMatrix2x2(tmatrix2f{kgcmat[p1].xx, kgcmat[p1].xz, kgcmat[p1].xz, kgcmat[p1].zz});
+        kgcmat[p1]=tsymatrix3f{kgcmat2d.a11, 0.0f, kgcmat2d.a12, 0.0f, 0.0f, kgcmat2d.a22};
+      }else{
+        kgcmat[p1]=cumath::InverseMatrix3x3(kgcmat[p1]);
+      }
+    }
   }
 }
 

@@ -804,7 +804,7 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
             }
           }
           //! DELETE THIS
-          const float prs=(kgcmat[p1].xx!=FLT_MAX? press[p2]-pressp1: pressp1+press[p2]);
+          const float prs=(kgc && kgcmat[p1].xx!=FLT_MAX? press[p2]-pressp1: pressp1+press[p2]);
           const float p_vpm=prs*massp2/velrhop2.w;
           // const float p_vpm=1.0f*massp2/velrhop2.w; // Gradient of 1
           float frxbar_=frx;

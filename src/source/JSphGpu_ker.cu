@@ -690,7 +690,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
       }
       //! DELETE THIS
       const float pressp2=cufsph::ComputePressCte(velrhop2.w);
-      const float prs=(kgcmat[p1].xx!=FLT_MAX? pressp2-pressp1: pressp1+pressp2);
+      const float prs=(kgc && kgcmat[p1].xx!=FLT_MAX? pressp2-pressp1: pressp1+pressp2);
       const float p_vpm=prs*massp2/velrhop2.w;
       float frxbar_=frx;
       float frybar_=fry;

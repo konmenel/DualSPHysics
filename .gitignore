@@ -24,4 +24,5 @@ bin/windows/*.exp
 ## Clangd config files
 .clangd
 compile_commands.json
+.cache/
 

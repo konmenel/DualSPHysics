@@ -20,3 +20,8 @@ bin/windows/*.iobj
 bin/windows/*.ipdb
 bin/windows/*.lib
 bin/windows/*.exp
+
+## Clangd config files
+.clangd
+compile_commands.json
+

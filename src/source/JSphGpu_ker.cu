@@ -874,10 +874,10 @@ template<TpKernel tker,TpFtMode ftmode>
 
     //-Interaction with boundaries.
     ini3-=cellfluid; fin3-=cellfluid;
-    for(int c3=ini3;c3<fin3;c3+=nc.w)for(int c2=ini2;c2<fin2;c2+=nc.x){
+    for(int c3=ini3;c3<fin3 && kgcmat[p1].xx!=FLT_MAX;c3+=nc.w)for(int c2=ini2;c2<fin2 && kgcmat[p1].xx!=FLT_MAX;c2+=nc.x){
       unsigned pini,pfin=0;  cunsearch::ParticleRange(c2,c3,ini1,fin1,begincell,pini,pfin);
       if(pfin){
-        for(int p2=pini;p2<pfin;p2++){
+        for(int p2=pini;p2<pfin && kgcmat[p1].xx!=FLT_MAX;p2++){
           const float4 pscellp2=poscell[p2];
           const float drx=pscellp1.x-pscellp2.x + CTE.poscellsize*(PSCEL_GetfX(pscellp1.w)-PSCEL_GetfX(pscellp2.w));
           const float dry=pscellp1.y-pscellp2.y + CTE.poscellsize*(PSCEL_GetfY(pscellp1.w)-PSCEL_GetfY(pscellp2.w));

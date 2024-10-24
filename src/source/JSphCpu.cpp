@@ -1113,10 +1113,10 @@ void JSphCpu::ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos,const 
 
     //--Boundary neighbors
     ngs=nsearch::Init(posp1,true,divdata);
-    for(int z=ngs.zini;z<ngs.zfin;z++)for(int y=ngs.yini;y<ngs.yfin;y++){
+    for(int z=ngs.zini;z<ngs.zfin && kgcmat[p1].xx!=FLT_MAX;z++)for(int y=ngs.yini;y<ngs.yfin && kgcmat[p1].xx!=FLT_MAX;y++){
       const tuint2 pif=nsearch::ParticleRange(y,z,ngs,divdata);
 
-      for(unsigned p2=pif.x;p2<pif.y;p2++){
+      for(unsigned p2=pif.x;p2<pif.y && kgcmat[p1].xx!=FLT_MAX;p2++){
         const float drx=float(posp1.x-pos[p2].x);
         const float dry=float(posp1.y-pos[p2].y);
         const float drz=float(posp1.z-pos[p2].z);

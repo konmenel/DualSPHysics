@@ -171,7 +171,7 @@ NCC=$(DIRTOOLKIT)/bin/nvcc
 ifeq ($(USE_DEBUG), NO)
   NCCFLAGS+=-c $(GENCODE) -O3 -ccbin $(CC)
 else
-  NCCFLAGS+=-c $(GENCODE) -O0 -ccbin $(CC) -g
+  NCCFLAGS+=-c $(GENCODE) -O0 -ccbin $(CC) -g -G
 endif
 ifeq ($(USE_FAST_MATH), YES)
   NCCFLAGS+= -use_fast_math

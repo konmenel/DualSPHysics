@@ -190,6 +190,7 @@ protected:
 
   //-Variables for Kernel Gradient Correction
   tsymatrix3f *KgcMatg;     ///<The correction matrix "A".
+  byte *KgcPartTypeg;       ///<A bit value that identifies the type of particle. 0 is internal particles. 0b1 is fs particles and 0b10 are particles with boundary neighbours. 0b11 is the combination if the two.
   //! DELELE THIS
   float3 *GradPresg;       //<Pressure Gradient for testing.
   //! DELETE THIS

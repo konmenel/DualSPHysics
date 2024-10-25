@@ -369,6 +369,17 @@ typedef enum{
   SHIFT_None=0              ///<Shifting is not applied.
 }TpShifting; 
 
+// Macros for Kernel Gradient Correction
+#define KGC_FSCode 0b1
+#define KGC_BoundCode 0b10
+
+#define KGC_IsInteral(parttype) ((parttype)==0)
+#define KGC_IsFSurface(parttype) ((parttype)&KGC_FSCode!=0)
+#define KGC_IsBoundary(parttype) ((parttype)&KGC_BoundCode!=0)
+
+#define KGC_SetFSurface(parttype) ((parttype)|KGC_FSCode)
+#define KGC_SetBoundary(parttype) ((parttype)|KGC_BoundCode)
+
 ///Types for Kernel Gradient Correction
 typedef enum{
   KGC_None=0,         ///<No Kernel Gradient Correction (KGC) is appled.

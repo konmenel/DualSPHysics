@@ -466,6 +466,7 @@ void JSphGpuSingle::Interaction_Forces(TpInterStep interstep){
     ,SpsGradvelg
     ,ShiftPosfsg
     ,KgcMatg
+    ,KgcPartTypeg
     //! DELETE THIS
     ,GradPresg
     //! DELETE THIS

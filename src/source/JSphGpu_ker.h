@@ -132,6 +132,7 @@ typedef struct StrInterParmsg{
   tsymatrix3f *gradvel;
   float4 *shiftposfs;
   tsymatrix3f *kgcmat;
+  byte *kgcparttype;
   //! DELETE THIS
   float3 *gradpres;
   //! DELETE THIS
@@ -159,6 +160,7 @@ typedef struct StrInterParmsg{
     ,tsymatrix3f *spsgradvel_
     ,float4 *shiftposfs_
     ,tsymatrix3f *kgcmat_
+    ,byte *kgcparttype_
     //! DELETE THIS
     ,float3 *gradpres_
     //! DELETE THIS
@@ -190,6 +192,7 @@ typedef struct StrInterParmsg{
     gradvel=spsgradvel_;
     shiftposfs=shiftposfs_;
     kgcmat=kgcmat_;
+    kgcparttype=kgcparttype_;
     gradpres=gradpres_;
     //-Other values and objects.
     stm=stm_;

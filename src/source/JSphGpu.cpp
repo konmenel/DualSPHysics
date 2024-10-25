@@ -146,7 +146,7 @@ void JSphGpu::InitVars(){
   VelrhopM1g=NULL;                                 //-Verlet
   PosxyPreg=NULL; PoszPreg=NULL; VelrhopPreg=NULL; //-Symplectic
   SpsTaug=NULL; SpsGradvelg=NULL;                  //-Laminar+SPS. 
-  KgcMatg=NULL;                                    //-Kernel Correction
+  KgcMatg=NULL; KgcPartTypeg=NULL;                 //-Kernel Correction
   //! DELETE THIS
   GradPresg=NULL;
   //! DELETE THIS
@@ -347,6 +347,7 @@ void JSphGpu::AllocGpuMemoryParticles(unsigned np,float over){
   }
   if(TKgc!=KGC_None){     
     ArraysGpu->AddArrayCount(JArraysGpu::SIZE_24B,1); //-KgcMat
+    ArraysGpu->AddArrayCount(JArraysGpu::SIZE_1B,1);  //-KgcPartType
   }
   if(CaseNfloat){
     ArraysGpu->AddArrayCount(JArraysGpu::SIZE_4B,4);  //-FtMasspg
@@ -705,6 +706,7 @@ void JSphGpu::ConfigBlockSizes(bool usezone,bool useperi){
         ,NULL
         ,NULL
         ,NULL
+        ,NULL
         //! DELETE THIS
         ,NULL
         //! DELETE THIS
@@ -870,7 +872,10 @@ void JSphGpu::PreInteractionVars_Forces(unsigned np,unsigned npb){
   if(Deltag)cudaMemset(Deltag,0,sizeof(float)*np);                       //Deltag[]=0
   cudaMemset(Aceg,0,sizeof(tfloat3)*np);                                 //Aceg[]=(0,0,0)
   if(SpsGradvelg)cudaMemset(SpsGradvelg+npb,0,sizeof(tsymatrix3f)*npf);  //SpsGradvelg[]=(0,0,0,0,0,0).
-  if(KgcMatg)cudaMemset(KgcMatg+npb,0,sizeof(tsymatrix3f)*npf);          //KgcMatc[]=(0,0,0,0,0,0).
+  if(KgcMatg){
+    cudaMemset(KgcMatg+npb,0,sizeof(tsymatrix3f)*npf);                    //KgcMatg[]=(0,0,0,0,0,0).
+    cudaMemset(KgcPartTypeg+npb,0,sizeof(byte)*npf);                      //KgcPartTypeg[]=0
+  }
   if(ShiftPosfsg)cudaMemset(ShiftPosfsg+npb,0,sizeof(float4)*npf);       //ShiftPosfsg[]=(0,0,0,0).
   //! DETELE THIS
   cudaMemset(GradPresg+npb,0,sizeof(tfloat3)*npf);
@@ -896,7 +901,10 @@ void JSphGpu::PreInteraction_Forces(){
   if(DDTArray)Deltag=ArraysGpu->ReserveFloat();
   if(Shifting)ShiftPosfsg=ArraysGpu->ReserveFloat4();
   if(TVisco==VISCO_LaminarSPS)SpsGradvelg=ArraysGpu->ReserveSymatrix3f();
-  if(TKgc!=KGC_None)KgcMatg=ArraysGpu->ReserveSymatrix3f();
+  if(TKgc!=KGC_None){
+    KgcMatg=ArraysGpu->ReserveSymatrix3f();
+    KgcPartTypeg=ArraysGpu->ReserveByte();
+  }
 
   //-Initialise arrays.
   PreInteractionVars_Forces(Np,Npb);
@@ -926,6 +934,7 @@ void JSphGpu::PosInteraction_Forces(){
   ArraysGpu->Free(ShiftPosfsg);  ShiftPosfsg=NULL;
   ArraysGpu->Free(SpsGradvelg);  SpsGradvelg=NULL;
   ArraysGpu->Free(KgcMatg);      KgcMatg=NULL;
+  ArraysGpu->Free(KgcPartTypeg); KgcPartTypeg=NULL;
 }
 
 //==============================================================================

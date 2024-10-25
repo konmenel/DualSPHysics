@@ -549,7 +549,7 @@ void JSphCpuSingle::Interaction_Forces(TpInterStep interstep){
     ,Arc,Acec,Deltac
     ,ShiftingMode,ShiftPosfsc
     ,SpsTauc,SpsGradvelc
-    ,TKgc,KgcMatc
+    ,TKgc,KgcMatc,KgcPartTypec
     //! DELETE THIS
     ,GradPresc
     //! DELETE THIS

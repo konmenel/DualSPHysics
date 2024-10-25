@@ -48,6 +48,7 @@ typedef struct{
   tsymatrix3f *spsgradvel;
   TpKgc tkgc;
   tsymatrix3f *kgcmat;
+  byte *kgcparttype;
   //! DELETE THIS
   tfloat3 *gradpres;
   //! DELETE THIS
@@ -62,7 +63,7 @@ inline stinterparmsc StInterparmsc(unsigned np,unsigned npb,unsigned npbok
   ,float* ar,tfloat3 *ace,float *delta
   ,TpShifting shiftmode,tfloat4 *shiftposfs
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
-  ,TpKgc tkgc,tsymatrix3f *kgcmat
+  ,TpKgc tkgc,tsymatrix3f *kgcmat,byte *kgcparttype
   //! DELETE THIS
   ,tfloat3 *gradpres
   //! DELETE THIS
@@ -76,7 +77,7 @@ inline stinterparmsc StInterparmsc(unsigned np,unsigned npb,unsigned npbok
     ,ar,ace,delta
     ,shiftmode,shiftposfs
     ,spstau,spsgradvel
-    ,tkgc,kgcmat
+    ,tkgc,kgcmat,kgcparttype
     //! DELETE THIS
     ,gradpres
     //! DELETE THIS
@@ -174,6 +175,7 @@ protected:
 
   //-Variables for Kernel Gradient Correction
   tsymatrix3f *KgcMatc;     ///<The correction matrix "A".
+  byte *KgcPartTypec;       ///<A bit value that identifies the type of particle. 0 is internal particles. 0b1 is fs particles and 0b10 are particles with boundary neighbours. 0b11 is the combination if the two.
   //! DELELE THIS
   tfloat3 *GradPresc;       //<Pressure Gradient for testing.
   //! DELETE THIS
@@ -248,7 +250,7 @@ protected:
     ,const float *press,const tfloat3 *dengradcorr
     ,float &viscdt,float *ar,tfloat3 *ace,float *delta
     ,TpShifting shiftmode,tfloat4 *shiftposfs
-    ,const tsymatrix3f* kgcmat/*! DELETE THIS */,tfloat3 *gradpres/*! DELETE THIS */)const;
+    ,const tsymatrix3f* kgcmat,const byte *kgcparttype/*! DELETE THIS */,tfloat3 *gradpres/*! DELETE THIS */)const;
 
   void InteractionForcesDEM(unsigned nfloat,StDivDataCpu divdata,const unsigned *dcell
     ,const unsigned *ftridp,const StDemData* demobjs
@@ -278,7 +280,7 @@ protected:
   void ComputeSpsTau(unsigned n,unsigned pini,const tfloat4 *velrhop,const tsymatrix3f *gradvel,tsymatrix3f *tau)const;
 
   template<TpKernel tker,TpFtMode ftmode> void ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos ,const tfloat4 *velrhop
-    ,const StDivDataCpu& divdata, const unsigned *dcell,const typecode *code,tsymatrix3f *kgcmat)const;
+    ,const StDivDataCpu& divdata, const unsigned *dcell,const typecode *code,tsymatrix3f *kgcmat,byte *kgcparttype)const;
 
   void ComputeVerletVarsFluid(bool shift,const tfloat3 *indirvel,const tfloat4 *velrhop1,const tfloat4 *velrhop2,double dt,double dt2,tdouble3 *pos,unsigned *cell,typecode *code,tfloat4 *velrhopnew)const;
   void ComputeVelrhopBound(const tfloat4* velrhopold,double armul,tfloat4* velrhopnew)const;

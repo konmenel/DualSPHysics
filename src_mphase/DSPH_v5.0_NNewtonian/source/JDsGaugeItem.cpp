@@ -1065,7 +1065,7 @@ void JGaugeForce::CalculeGpu(double timestep,const StDivDataGpu &dvd
   SetTimeStep(timestep);
   //-Initializes acceleration array to zero.
   cudaMemset(PartAceg,0,sizeof(float3)*Count);
-  const int n=int(TypeParts==TpPartFixed || TypeParts==TpPartMoving? npbok: np);
+  const int n=int(TypeParts==TpPartFixed || TypeParts==TpPartMoving || TypeParts==TpPartFloating? npbok: np);
   //-Computes acceleration in selected boundary particles.
   cugauge::Interaction_GaugeForce(CSP,dvd,n,IdBegin,Code
     ,posxy,posz,code,idp,velrhop,PartAceg);

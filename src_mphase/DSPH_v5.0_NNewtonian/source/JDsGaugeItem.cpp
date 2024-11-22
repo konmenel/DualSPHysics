@@ -989,7 +989,7 @@ template<TpKernel tker> void JGaugeForce::CalculeCpuT(double timestep
   SetTimeStep(timestep);
   //-Computes acceleration in selected boundary particles.
   memset(PartAcec,0,sizeof(tfloat3)*Count);
-  const int n=int(TypeParts==TpPartFixed || TypeParts==TpPartMoving? npbok: np);
+  const int n=int(TypeParts==TpPartFixed || TypeParts==TpPartMoving || TypeParts==TpPartFloating? npbok: np);
   #ifdef OMP_USE
     #pragma omp parallel for schedule (guided)
   #endif

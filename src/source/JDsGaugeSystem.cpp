@@ -349,7 +349,7 @@ JGaugeForce* JGaugeSystem::AddGaugeForce(std::string name,double computestart
   if(cmk>=mkinfo->Size())Run_Exceptioon(fun::PrintStr("Error loading boundary objects. Mkbound=%u is unknown.",mkbound));
   const JSphMkBlock* mkb=mkinfo->Mkblock(cmk);
   const TpParticles typeparts=mkb->Type;
-  if(typeparts!=TpPartFixed && typeparts!=TpPartMoving)Run_Exceptioon(fun::PrintStr("Type of boundary particles (Mkbound=%u) is invalid. Only fixed or moving particles are allowed.",mkbound));
+  if(typeparts!=TpPartFixed && typeparts!=TpPartMoving && typeparts!=TpPartFloating)Run_Exceptioon(fun::PrintStr("Type of boundary particles (Mkbound=%u) is invalid. Only fixed, moving or floating particles are allowed.",mkbound));
   const unsigned idbegin=mkb->Begin;
   const unsigned count=mkb->Count;
   const typecode code=mkb->Code;

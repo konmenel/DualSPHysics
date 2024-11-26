@@ -997,7 +997,7 @@ template<TpKernel tker> void JGaugeForce::CalculeCpuT(double timestep
   SetTimeStep(timestep);
   //-Computes acceleration in selected boundary particles.
   memset(PartAcec,0,sizeof(tfloat3)*Count);
-  const int n=int(TypeParts==TpPartFixed || TypeParts==TpPartMoving || TypeParts==TpPartFloating? npbok: np);
+  const int n=int(TypeParts==TpPartFixed || TypeParts==TpPartMoving? npbok: np);
   #ifdef OMP_USE
     #pragma omp parallel for schedule (guided)
   #endif
@@ -1073,7 +1073,7 @@ void JGaugeForce::CalculeGpu(double timestep,const StDivDataGpu &dvd
   SetTimeStep(timestep);
   //-Initializes acceleration array to zero.
   cudaMemset(PartAceg,0,sizeof(float3)*Count);
-  const int n=int(TypeParts==TpPartFixed || TypeParts==TpPartMoving || TypeParts==TpPartFloating? npbok: np);
+  const int n=int(TypeParts==TpPartFixed || TypeParts==TpPartMoving? npbok: np);
   //-Computes acceleration in selected boundary particles.
   cugauge::Interaction_GaugeForce(CSP,dvd,n,IdBegin,Code
     ,posxy,posz,code,idp,velrhop,PartAceg);

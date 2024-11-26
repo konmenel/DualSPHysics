@@ -23,3 +23,7 @@ bin/windows/*.ipdb
 bin/windows/*.lib
 bin/windows/*.exp
 src/source/*.o
+
+## clangd files
+.clangd
+compile_commands*.json

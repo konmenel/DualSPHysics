@@ -257,6 +257,9 @@ public:
   unsigned GetPointDef(std::vector<tfloat3> &points)const;
 
   tdouble3 GetPoint()const{ return(Point); }
+  bool     GetActiveLink()const{ return(ActiveLink); }
+  word     GetMkBound()   const{ return(MkBound); }
+  TpParticles GetTypeParts()const{ return(TypeParts); }
   const StGaugeVelRes& GetResult()const{ return(Result); }
 
   void SetPoint(const tdouble3 &point){ ClearResult(); Point=point; }

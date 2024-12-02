@@ -155,6 +155,8 @@ void JGaugeItem::GetConfig(std::vector<std::string> &lines)const{
   if(Type==GAUGE_Vel){
     const JGaugeVelocity* gau=(JGaugeVelocity*)this;
     lines.push_back(fun::PrintStr("Point......: (%g,%g,%g)",gau->GetPoint().x,gau->GetPoint().y,gau->GetPoint().z));
+    if(gau->GetActiveLink())
+      lines.push_back(fun::PrintStr("Link......: MkBound=%u (%s particles)",gau->GetMkBound(),TpPartGetStrCode(gau->GetTypeParts())));
   }
   else if(Type==GAUGE_Swl){
     const JGaugeSwl* gau=(JGaugeSwl*)this;

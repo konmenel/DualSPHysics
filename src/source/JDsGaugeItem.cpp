@@ -232,13 +232,24 @@ void JGaugeItem::SaveResults(unsigned cpart){
 //==============================================================================
 /// Constructor.
 //==============================================================================
-JGaugeVelocity::JGaugeVelocity(unsigned idx,std::string name,tdouble3 point,bool cpu)
+JGaugeVelocity::JGaugeVelocity(unsigned idx,std::string name,tdouble3 point
+  ,bool activelink,word mkbound,TpParticles typeparts,bool cpu)
   :JGaugeItem(GAUGE_Vel,idx,name,cpu)
 {
   ClassName="JGaugeVel";
   FileInfo=string("Saves velocity data measured from fluid particles (by ")+ClassName+").";
   Reset();
   SetPoint(point);
+  ActiveLink=activelink;
+  MkBound=mkbound;
+  TypeParts=typeparts;
+  FtObjs=NULL;
+  MotObjs=NULL;
+  #ifdef _WITHGPU
+  FtCenterg=NULL;
+  FtAnglesg=NULL;
+  #endif
+  RelDist=TDouble3(0);
 }
 
 //==============================================================================
@@ -388,6 +399,88 @@ void JGaugeVelocity::CalculeCpu(double timestep,const StDivDataCpu &dvd
   }
 }
 
+//==============================================================================
+/// Sets the points to the floating or moving body link.
+//==============================================================================
+void JGaugeVelocity::ConfigureLinks(unsigned ftcount,StFloatingData *&ftobjs,const JDsMotion *dsmotion){
+  if (ActiveLink){
+    switch (TypeParts){
+    case TpPartFixed:{
+      ActiveLink=false;
+      FtObjs=NULL;
+      MotObjs=NULL;
+      break;
+    }
+    case TpPartFloating:{
+      MotObjs=NULL;
+      FtObjs=&ftobjs;
+      unsigned cf=0;
+      for(;cf<ftcount;cf++){
+        if (ftobjs[cf].mkbound==MkBound){
+          BodyOffset=cf;
+          RelDist = Point-ftobjs[cf].center;
+          break;
+        }
+      }
+      if (cf==ftcount) Run_Exceptioon(fun::PrintStr("Floating with mkbound=%u could not be found.",MkBound));
+      break;
+    }
+    case TpPartMoving:{
+      FtObjs=NULL;
+      MotObjs=dsmotion;
+      unsigned ref=0;
+      const unsigned nref=dsmotion->GetNumObjects();
+      for(;ref<nref;ref++){
+        const StMotionData& m=dsmotion->GetMotionData(ref);
+        if (m.mkbound==MkBound){
+          BodyOffset=ref;
+          break;
+        }
+      }
+      if (ref==nref) Run_Exceptioon(fun::PrintStr("Moving body with mkbound=%u could not be found.",MkBound));
+      break;
+    }
+    default: Run_Exceptioon("Unsupported supported block type");
+    }
+  }
+}
+
+//==============================================================================
+/// Updates the location of the point if a link is active.
+//==============================================================================
+void JGaugeVelocity::UpdateLinkPoint(){
+  if(ActiveLink){
+    if (TypeParts==TpPartFloating){
+      const StFloatingData &ftobj=(*FtObjs)[BodyOffset];
+      tdouble3 center=ftobj.center;
+      tdouble3 angles=ToTDouble3(ftobj.angles);
+      tmatrix3d rot = fmath::RotMatrix3x3(angles);
+      tmatrix4d mat = TMatrix4d(
+        rot.a11, rot.a12, rot.a13, center.x,
+        rot.a21, rot.a22, rot.a23, center.y,
+        rot.a31, rot.a32, rot.a33, center.z,
+              0,       0,       0,        1);
+      tdouble3 p2 = MatrixMulPoint(mat, RelDist);
+      if(CSP.simulate2d)p2.y=Point.y;
+      Point=p2;
+    }
+    else if (TypeParts==TpPartMoving){
+      const StMotionData &motobj=MotObjs->GetMotionData(BodyOffset);
+      if(motobj.type==MOTT_Linear){//-Linear movement.
+        tdouble3 mov=motobj.linmov;
+        tdouble3 p2=Point+mov;
+        if(CSP.simulate2d)p2.y=Point.y;
+        Point=p2;
+      }
+      else if(motobj.type==MOTT_Matrix){//-Matrix movement (for rotations).
+        tdouble3 p2 = MatrixMulPoint(motobj.matmov, Point);
+        if(CSP.simulate2d)p2.y=Point.y;
+        Point=p2;
+      }  
+    }
+  }
+}
+
 #ifdef _WITHGPU
 //==============================================================================
 /// Calculates velocity at indicated points (on GPU).
@@ -409,6 +502,98 @@ void JGaugeVelocity::CalculeGpu(double timestep,const StDivDataGpu &dvd
   Result.Set(timestep,ToTFloat3(Point),ptvel);
   //Log->Printf("------> t:%f",TimeStep);
   if(Output(timestep))StoreResult();
+}
+
+//==============================================================================
+/// Sets the points to the floating or moving body link (on GPU).
+//==============================================================================
+void JGaugeVelocity::ConfigureLinksGpu(unsigned ftcount,StFloatingData *&ftobjs,double3 *&ftcenterg
+    ,float3 *&ftanglesg,const JDsMotion *dsmotion){
+  if (ActiveLink){
+    switch (TypeParts){
+    case TpPartFixed:{
+      ActiveLink=false;
+      FtObjs=NULL;
+      MotObjs=NULL;
+      FtCenterg=NULL;
+      FtAnglesg=NULL;
+      break;
+    }
+    case TpPartFloating:{
+      MotObjs=NULL;
+      FtObjs=&ftobjs;
+      FtCenterg=&ftcenterg;
+      FtAnglesg=&ftanglesg;
+      unsigned cf=0;
+      for(;cf<ftcount;cf++){
+        if (ftobjs[cf].mkbound==MkBound){
+          BodyOffset=cf;
+          RelDist = Point-ftobjs[cf].center;
+          break;
+        }
+      }
+      if (cf==ftcount) Run_Exceptioon(fun::PrintStr("Floating with mkbound=%u could not be found.",MkBound));
+      break;
+    }
+    case TpPartMoving:{
+      FtObjs=NULL;
+      FtCenterg=NULL;
+      FtAnglesg=NULL;
+      MotObjs=dsmotion;
+      unsigned ref=0;
+      const unsigned nref=dsmotion->GetNumObjects();
+      for(;ref<nref;ref++){
+        const StMotionData& m=dsmotion->GetMotionData(ref);
+        if (m.mkbound==MkBound){
+          BodyOffset=ref;
+          break;
+        }
+      }
+      if (ref==nref) Run_Exceptioon(fun::PrintStr("Moving body with mkbound=%u could not be found.",MkBound));
+      break;
+    }
+    default: Run_Exceptioon("Unsupported supported block type");
+    }
+  }
+}
+
+//==============================================================================
+/// Updates the location of the point if a link is active with Gpu.
+//==============================================================================
+void JGaugeVelocity::UpdateLinkPointGpu(){
+  if(ActiveLink){
+    if (TypeParts==TpPartFloating){
+      const double3 &ftcenterg=(*FtCenterg)[BodyOffset];
+      const float3 &ftanglesg=(*FtAnglesg)[BodyOffset];
+      tdouble3 center=TDouble3(0);
+      tfloat3 angles=TFloat3(0);
+      cudaMemcpy(&center,&ftcenterg,sizeof(double3),cudaMemcpyDeviceToHost);
+      cudaMemcpy(&angles,&ftanglesg,sizeof(float3),cudaMemcpyDeviceToHost);
+      tmatrix3d rot = fmath::RotMatrix3x3(ToTDouble3(angles));
+      tmatrix4d mat = TMatrix4d(
+        rot.a11, rot.a12, rot.a13, center.x,
+        rot.a21, rot.a22, rot.a23, center.y,
+        rot.a31, rot.a32, rot.a33, center.z,
+              0,       0,       0,        1);
+      tdouble3 p2 = MatrixMulPoint(mat, RelDist);
+      if(CSP.simulate2d)p2.y=Point.y;
+      Point=p2;
+    }
+    else if (TypeParts==TpPartMoving){
+      const StMotionData &motobj=MotObjs->GetMotionData(BodyOffset);
+      if(motobj.type==MOTT_Linear){//-Linear movement.
+        tdouble3 mov=motobj.linmov;
+        tdouble3 p2=Point+mov;
+        if(CSP.simulate2d)p2.y=Point.y;
+        Point=p2;
+      }
+      else if(motobj.type==MOTT_Matrix){//-Matrix movement (for rotations).
+        tdouble3 p2 = MatrixMulPoint(motobj.matmov, Point);
+        if(CSP.simulate2d)p2.y=Point.y;
+        Point=p2;
+      }  
+    }
+  }
 }
 #endif
 
@@ -1215,7 +1400,7 @@ unsigned JGaugePressure::GetPointDef(std::vector<tfloat3> &points)const{
 }
 
 //==============================================================================
-/// Calculates velocity at indicated points (on CPU).
+/// Calculates pressure at indicated points (on CPU).
 //==============================================================================
 template<TpKernel tker> void JGaugePressure::CalculeCpuT(double timestep
   ,const StDivDataCpu &dvd,unsigned npbok,unsigned npb,unsigned np,const tdouble3 *pos
@@ -1262,7 +1447,7 @@ template<TpKernel tker> void JGaugePressure::CalculeCpuT(double timestep
 }
 
 //==============================================================================
-/// Calculates velocity at indicated points (on CPU).
+/// Calculates pressure at indicated points (on CPU).
 //==============================================================================
 void JGaugePressure::CalculeCpu(double timestep,const StDivDataCpu &dvd
   ,unsigned npbok,unsigned npb,unsigned np,const tdouble3 *pos
@@ -1294,7 +1479,6 @@ void JGaugePressure::ConfigureLinks(unsigned ftcount,StFloatingData *&ftobjs,con
       for(;cf<ftcount;cf++){
         if (ftobjs[cf].mkbound==MkBound){
           BodyOffset=cf;
-          // FtObj=&(ftobjs[cf]);
           RelDist = Point-ftobjs[cf].center;
           break;
         }
@@ -1311,7 +1495,6 @@ void JGaugePressure::ConfigureLinks(unsigned ftcount,StFloatingData *&ftobjs,con
         const StMotionData& m=dsmotion->GetMotionData(ref);
         if (m.mkbound==MkBound){
           BodyOffset=ref;
-          // MotObj=&m;
           break;
         }
       }
@@ -1407,9 +1590,6 @@ void JGaugePressure::ConfigureLinksGpu(unsigned ftcount,StFloatingData *&ftobjs,
       for(;cf<ftcount;cf++){
         if (ftobjs[cf].mkbound==MkBound){
           BodyOffset=cf;
-          // FtObj=&(ftobjs[cf]);
-          // FtCenterg=&(ftcenterg[cf]);
-          // FtAnglesg=&(ftanglesg[cf]);
           RelDist = Point-ftobjs[cf].center;
           break;
         }
@@ -1428,7 +1608,6 @@ void JGaugePressure::ConfigureLinksGpu(unsigned ftcount,StFloatingData *&ftobjs,
         const StMotionData& m=dsmotion->GetMotionData(ref);
         if (m.mkbound==MkBound){
           BodyOffset=ref;
-          // MotObj=&m;
           break;
         }
       }

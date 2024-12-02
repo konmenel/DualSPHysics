@@ -215,6 +215,22 @@ protected:
   //-Definition.
   tdouble3 Point;
 
+  // Data for link
+  bool ActiveLink;              //True of link is valid (i.e. to floating or moving boudnary)
+  word MkBound;                 //<The mk value of the boundary
+  TpParticles TypeParts;        //<Type of the link particles (Floating or Moving)
+  tdouble3 RelDist;             //<Relative distance to floating (if link is to a floating)
+  
+  // NOTE: Double pointer because this class does not own the pointers so if the arrays ever resize the 
+  // pointers will be correct
+  size_t BodyOffset;            //<The offset of the floating or moving body in the arrays below.
+  StFloatingData **FtObjs;      //<The floating data array (NULL if link is to moving boundary)
+  const JDsMotion *MotObjs;     //<The motion's data array (NULL if link is to floating body)
+  #ifdef _WITHGPU
+  double3 **FtCenterg;          //<The center of the floating in GPU (NULL if link is to moving boundary)
+  float3 **FtAnglesg;           //<The euler angles of the floating in GPU (NULL if link is to moving boundary)
+  #endif
+
   StGaugeVelRes Result; ///<Result of the last measure.
 
   std::vector<StGaugeVelRes> OutBuff; ///<Results in buffer.
@@ -224,8 +240,17 @@ protected:
   void StoreResult();
 
 public:
-  JGaugeVelocity(unsigned idx,std::string name,tdouble3 point,bool cpu);
+  JGaugeVelocity(unsigned idx,std::string name,tdouble3 point
+    ,bool activelink,word mkbound,TpParticles typeparts,bool cpu);
   ~JGaugeVelocity();
+
+  void ConfigureLinks(unsigned ftcount,StFloatingData *&ftobjs,const JDsMotion *dsmotion)override;
+  void UpdateLinkPoint()override;
+  #ifdef _WITHGPU
+  void ConfigureLinksGpu(unsigned ftcount,StFloatingData *&ftobjs,double3 *&ftcenterg
+    ,float3 *&ftanglesg,const JDsMotion *dsmotion)override;
+  void UpdateLinkPointGpu()override;
+  #endif
 
   void SaveResults();
   void SaveVtkResult(unsigned cpart);
@@ -505,6 +530,8 @@ public:
 protected:
   //-Definition.
   tdouble3 Point;
+
+  // Data for link
   bool ActiveLink;              //True of link is valid (i.e. to floating or moving boudnary)
   word MkBound;                 //<The mk value of the boundary
   TpParticles TypeParts;        //<Type of the link particles (Floating or Moving)

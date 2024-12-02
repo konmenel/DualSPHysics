@@ -119,17 +119,6 @@ ifeq ($(CUDAVER),12)
   # GENCODE:=$(GENCODE) -gencode=arch=compute_52,code=\"sm_52,compute_52\"
   # GENCODE:=$(GENCODE) -gencode=arch=compute_61,code=\"sm_61,compute_61\"
   # GENCODE:=$(GENCODE) -gencode=arch=compute_70,code=\"sm_70,compute_70\"
-  # GENCODE:=$(GENCODE) -gencode=arch=compute_75,code=\"sm_75,compute_75\"
-  GENCODE:=$(GENCODE) -gencode=arch=compute_80,code=\"sm_80,compute_80\"
-endif
-ifeq ($(CUDAVER),12)
-  # module load cuda/11.7
-  # GENCODE:=$(GENCODE) -gencode=arch=compute_30,code=\"sm_30,compute_30\"
-  # GENCODE:=$(GENCODE) -gencode=arch=compute_35,code=\"sm_35,compute_35\"
-  # GENCODE:=$(GENCODE) -gencode=arch=compute_50,code=\"sm_50,compute_50\"
-  # GENCODE:=$(GENCODE) -gencode=arch=compute_52,code=\"sm_52,compute_52\"
-  # GENCODE:=$(GENCODE) -gencode=arch=compute_61,code=\"sm_61,compute_61\"
-  # GENCODE:=$(GENCODE) -gencode=arch=compute_70,code=\"sm_70,compute_70\"
   GENCODE:=$(GENCODE) -gencode=arch=compute_75,code=\"sm_75,compute_75\"
   # GENCODE:=$(GENCODE) -gencode=arch=compute_80,code=\"sm_80,compute_80\"
   # GENCODE:=$(GENCODE) -gencode=arch=compute_89,code=\"sm_89,compute_89\"

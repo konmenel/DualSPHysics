@@ -31,7 +31,7 @@ namespace cugauge{
 //-Kernel for JGaugeVelocity.
 void Interaction_GaugeVel(const StCteSph &CSP,const StDivDataGpu &dvd
   ,tdouble3 ptpos,const double2 *posxy,const double *posz
-  ,const typecode *code,const float4 *velrhop,float3 *ptvel);
+  ,const typecode *code,const float4 *velrhop,float4 *ptvel);
 
 //-Kernel for JGaugeSwl.
 void Interaction_GaugeSwl(const StCteSph &CSP,const StDivDataGpu &dvd

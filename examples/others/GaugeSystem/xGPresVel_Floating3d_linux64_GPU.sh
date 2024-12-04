@@ -8,7 +8,7 @@ fail () {
 
 # "name" and "dirout" are named according to the testcase
 
-export name=GPres_Floating3d
+export name=GPresVel_Floating3d
 export dirout=${name}_out
 export diroutdata=${dirout}/data
 

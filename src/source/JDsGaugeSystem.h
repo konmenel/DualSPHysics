@@ -130,7 +130,7 @@ private:
 
   //-Variables for GPU.
  #ifdef _WITHGPU
-  float3* AuxMemoryg;  ///<Auxiliary allocated memory on GPU [1].
+  float4* AuxMemoryg;  ///<Auxiliary allocated memory on GPU [1].
  #endif
 
   //-Variables for saving input state.

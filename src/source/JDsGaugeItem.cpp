@@ -305,13 +305,13 @@ void JGaugeVelocity::SaveResults(){
     //-Saves head.
     if(first){
       scsv.SetHead();
-      scsv << "time [s];velx [m/s];vely [m/s];velz [m/s];posx [m];posy [m];posz [m]" << jcsv::Endl();
+      scsv << "time [s];velx [m/s];vely [m/s];velz [m/s];posx [m];posy [m];posz [m];kersum [-]" << jcsv::Endl();
     }
     //-Saves data.
     scsv.SetData();
     scsv << jcsv::Fmt(jcsv::TpFloat1,"%g") << jcsv::Fmt(jcsv::TpFloat3,"%g;%g;%g");
     for(unsigned c=0;c<OutCount;c++){
-      scsv << OutBuff[c].timestep << OutBuff[c].vel << OutBuff[c].point << jcsv::Endl();
+      scsv << OutBuff[c].timestep << OutBuff[c].vel << OutBuff[c].point << OutBuff[c].kersum << jcsv::Endl();
     }
     OutCount=0;
   }
@@ -349,6 +349,7 @@ template<TpKernel tker> void JGaugeVelocity::CalculeCpuT(double timestep
   SetTimeStep(timestep);
   //-Start measure.
   tfloat3 ptvel=TFloat3(0);
+  float kersum=0.0f;
   const bool ptout=PointIsOut(Point.x,Point.y,Point.z);//-Verify that the point is within domain boundaries. | Comprueba que el punto este dentro de limites del dominio.
   if(!ptout){
     //-Auxiliary variables.
@@ -381,9 +382,10 @@ template<TpKernel tker> void JGaugeVelocity::CalculeCpuT(double timestep
     //}
     //-Stores result. | Guarda resultado.
     ptvel=ToTFloat3(sumvel);
+    kersum=float(sumwab);
   }
   //-Stores result. | Guarda resultado.
-  Result.Set(timestep,ToTFloat3(Point),ptvel);
+  Result.Set(timestep,ToTFloat3(Point),ptvel,kersum);
   //Log->Printf("------> t:%f",TimeStep);
   if(Output(timestep))StoreResult();
 }
@@ -489,19 +491,21 @@ void JGaugeVelocity::UpdateLinkPoint(){
 //==============================================================================
 void JGaugeVelocity::CalculeGpu(double timestep,const StDivDataGpu &dvd
   ,unsigned npbok,unsigned npb,unsigned np,const double2 *posxy,const double *posz
-  ,const typecode *code,const unsigned *idp,const float4 *velrhop,float3 *aux)
+  ,const typecode *code,const unsigned *idp,const float4 *velrhop,float4 *aux)
 {
   SetTimeStep(timestep);
   //-Start measure.
   tfloat3 ptvel=TFloat3(0);
+  float kersum=0.0f;
   const bool ptout=PointIsOut(Point.x,Point.y,Point.z);//-Verify that the point is within domain boundaries. | Comprueba que el punto este dentro de limites del dominio.
   if(!ptout){
     cugauge::Interaction_GaugeVel(CSP,dvd,Point,posxy,posz,code,velrhop,aux);
     cudaMemcpy(&ptvel,aux,sizeof(float3),cudaMemcpyDeviceToHost);
+    cudaMemcpy(&kersum,&aux->w,sizeof(float),cudaMemcpyDeviceToHost);
     Check_CudaErroor("Failed in velocity calculation.");
   }
   //-Stores result. | Guarda resultado.
-  Result.Set(timestep,ToTFloat3(Point),ptvel);
+  Result.Set(timestep,ToTFloat3(Point),ptvel,kersum);
   //Log->Printf("------> t:%f",TimeStep);
   if(Output(timestep))StoreResult();
 }
@@ -599,6 +603,387 @@ void JGaugeVelocity::UpdateLinkPointGpu(){
 }
 #endif
 
+
+//##############################################################################
+//# JGaugePressure
+//##############################################################################
+//==============================================================================
+/// Constructor.
+//==============================================================================
+JGaugePressure::JGaugePressure(unsigned idx,std::string name,tdouble3 point
+  ,bool activelink,word mkbound,TpParticles typeparts,bool cpu)
+  :JGaugeItem(GAUGE_Pres,idx,name,cpu)
+{
+  ClassName="JGaugePres";
+  FileInfo=string("Saves pressure data measured from fluid particles (by ")+ClassName+").";
+  Reset();
+  SetPoint(point);
+  ActiveLink=activelink;
+  MkBound=mkbound;
+  TypeParts=typeparts;
+  FtObjs=NULL;
+  MotObjs=NULL;
+  #ifdef _WITHGPU
+  FtCenterg=NULL;
+  FtAnglesg=NULL;
+  #endif
+  RelDist=TDouble3(0);
+}
+
+//==============================================================================
+/// Destructor.
+//==============================================================================
+JGaugePressure::~JGaugePressure(){
+  DestructorActive=true;
+  Reset();
+}
+
+//==============================================================================
+/// Initialisation of variables.
+//==============================================================================
+void JGaugePressure::Reset(){
+  SetPoint(TDouble3(0));
+  ActiveLink=false;
+  MkBound=0;
+  TypeParts=TpPartUnknown;
+  FtObjs=NULL;
+  MotObjs=NULL;
+  #ifdef _WITHGPU
+  FtCenterg=NULL;
+  FtAnglesg=NULL;
+  #endif
+  RelDist=TDouble3(0);
+  JGaugeItem::Reset();
+}
+
+//==============================================================================
+/// Record the last measure result.
+//==============================================================================
+void JGaugePressure::StoreResult(){
+  if(OutputSave){
+    //-Allocates memory.
+    while(unsigned(OutBuff.size())<OutSize)OutBuff.push_back(StGaugePresRes());
+    //-Empty buffer.
+    if(OutCount+1>=OutSize)SaveResults();
+    //-Stores last results.
+    OutBuff[OutCount]=Result;
+    OutCount++;
+    //-Updates OutputNext.
+    if(OutputDt){
+      const unsigned nt=unsigned(TimeStep/OutputDt);
+      OutputNext=OutputDt*nt;
+      if(OutputNext<=TimeStep)OutputNext=OutputDt*(nt+1);
+    }
+  }
+}
+
+//==============================================================================
+/// Saves stored results in CSV file.
+//==============================================================================
+void JGaugePressure::SaveResults(){
+  if(OutCount){
+    const bool first=OutFile.empty();
+    if(first){
+      OutFile=GetResultsFileCsv();
+      Log->AddFileInfo(OutFile,FileInfo);
+    }
+    jcsv::JSaveCsv2 scsv(OutFile,!first,AppInfo.GetCsvSepComa());
+    //-Saves head.
+    if(first){
+      scsv.SetHead();
+      scsv << "time [s];press [Pa];posx [m];posy [m];posz [m];kersum [-]" << jcsv::Endl();
+    }
+    //-Saves data.
+    scsv.SetData();
+    scsv << jcsv::Fmt(jcsv::TpFloat1,"%g") << jcsv::Fmt(jcsv::TpFloat3,"%g;%g;%g");
+    for(unsigned c=0;c<OutCount;c++){
+      scsv << OutBuff[c].timestep << OutBuff[c].pres << OutBuff[c].point << OutBuff[c].kersum << jcsv::Endl();
+    }
+    OutCount=0;
+  }
+}
+
+//==============================================================================
+/// Saves last result in VTK file.
+//==============================================================================
+void JGaugePressure::SaveVtkResult(unsigned cpart){
+  if(JVtkLib::Available()){
+    //-Prepares data.
+    JDataArrays arrays;
+    arrays.AddArray("Pos",1,&(Result.point),false);
+    arrays.AddArray("Pres",1,&(Result.pres),false);
+    Log->AddFileInfo(fun::FileNameSec(GetResultsFileVtk(),UINT_MAX),FileInfo);
+    JVtkLib::SaveVtkData(fun::FileNameSec(GetResultsFileVtk(),cpart),arrays,"Pos");
+  }
+}
+
+//==============================================================================
+/// Loads and returns number definition points.
+//==============================================================================
+unsigned JGaugePressure::GetPointDef(std::vector<tfloat3> &points)const{
+  points.push_back(ToTFloat3(Point));
+  return(1);
+}
+
+//==============================================================================
+/// Calculates pressure at indicated points (on CPU).
+//==============================================================================
+template<TpKernel tker> void JGaugePressure::CalculeCpuT(double timestep
+  ,const StDivDataCpu &dvd,unsigned npbok,unsigned npb,unsigned np,const tdouble3 *pos
+  ,const typecode *code,const unsigned *idp,const tfloat4 *velrhop)
+{
+  SetTimeStep(timestep);
+  //-Start measure.
+  float ptpres=0.0f;
+  float kersum=0.0f;
+  const bool ptout=PointIsOut(Point.x,Point.y,Point.z);//-Verify that the point is within domain boundaries. | Comprueba que el punto este dentro de limites del dominio.
+
+  if(!ptout){
+    //-Auxiliary variables.
+    double sumwab=0;
+    float sumpres=0.0f;
+    //-Search for fluid neighbours in adjacent cells.
+    const StNgSearch ngs=nsearch::Init(Point,false,dvd);
+    for(int z=ngs.zini;z<ngs.zfin;z++)for(int y=ngs.yini;y<ngs.yfin;y++){
+      const tuint2 pif=nsearch::ParticleRange(y,z,ngs,dvd);
+      for(unsigned p2=pif.x;p2<pif.y;p2++){
+        const float rr2=nsearch::Distance2(Point,pos[p2]);
+        //-Interaction with real neighbouring particles.
+        if(rr2<=CSP.kernelsize2 && rr2>=ALMOSTZERO && CODE_IsFluid(code[p2])){
+          float wab=fsph::GetKernel_Wab<tker>(CSP,rr2);
+          tfloat4 velrhop2=velrhop[p2];
+          const float press2=fsph::ComputePress(velrhop2.w,CSP);
+          wab*=CSP.massfluid/velrhop2.w;
+          sumwab+=wab;
+          sumpres+=wab*press2;
+        }
+      }
+    }
+    //-Applies kernel correction.
+    // if(sumwab!=0) sumpres/=sumwab;
+
+    //-Stores result. | Guarda resultado.
+    ptpres=sumpres;
+    kersum=float(sumwab);
+  }
+  //-Stores result. | Guarda resultado.
+  Result.Set(timestep,ToTFloat3(Point),ptpres,kersum);
+  //Log->Printf("------> t:%f",TimeStep);
+  if(Output(timestep))StoreResult();
+}
+
+//==============================================================================
+/// Calculates pressure at indicated points (on CPU).
+//==============================================================================
+void JGaugePressure::CalculeCpu(double timestep,const StDivDataCpu &dvd
+  ,unsigned npbok,unsigned npb,unsigned np,const tdouble3 *pos
+  ,const typecode *code,const unsigned *idp,const tfloat4 *velrhop)
+{
+  switch(CSP.tkernel){
+    case KERNEL_Cubic:       //Kernel Wendland is used since Cubic is not available.
+    case KERNEL_Wendland:    CalculeCpuT<KERNEL_Wendland>  (timestep,dvd,npbok,npb,np,pos,code,idp,velrhop);  break;
+    default: Run_Exceptioon("Kernel unknown.");
+  }
+}
+
+//==============================================================================
+/// Sets the points to the floating or moving body link.
+//==============================================================================
+void JGaugePressure::ConfigureLinks(unsigned ftcount,StFloatingData *&ftobjs,const JDsMotion *dsmotion){
+  if (ActiveLink){
+    switch (TypeParts){
+    case TpPartFixed:{
+      ActiveLink=false;
+      FtObjs=NULL;
+      MotObjs=NULL;
+      break;
+    }
+    case TpPartFloating:{
+      MotObjs=NULL;
+      FtObjs=&ftobjs;
+      unsigned cf=0;
+      for(;cf<ftcount;cf++){
+        if (ftobjs[cf].mkbound==MkBound){
+          BodyOffset=cf;
+          RelDist = Point-ftobjs[cf].center;
+          break;
+        }
+      }
+      if (cf==ftcount) Run_Exceptioon(fun::PrintStr("Floating with mkbound=%u could not be found.",MkBound));
+      break;
+    }
+    case TpPartMoving:{
+      FtObjs=NULL;
+      MotObjs=dsmotion;
+      unsigned ref=0;
+      const unsigned nref=dsmotion->GetNumObjects();
+      for(;ref<nref;ref++){
+        const StMotionData& m=dsmotion->GetMotionData(ref);
+        if (m.mkbound==MkBound){
+          BodyOffset=ref;
+          break;
+        }
+      }
+      if (ref==nref) Run_Exceptioon(fun::PrintStr("Moving body with mkbound=%u could not be found.",MkBound));
+      break;
+    }
+    default: Run_Exceptioon("Unsupported supported block type");
+    }
+  }
+}
+
+//==============================================================================
+/// Updates the location of the point if a link is active.
+//==============================================================================
+void JGaugePressure::UpdateLinkPoint(){
+  if(ActiveLink){
+    if (TypeParts==TpPartFloating){
+      const StFloatingData &ftobj=(*FtObjs)[BodyOffset];
+      tdouble3 center=ftobj.center;
+      tdouble3 angles=ToTDouble3(ftobj.angles);
+      tmatrix3d rot = fmath::RotMatrix3x3(angles);
+      tmatrix4d mat = TMatrix4d(
+        rot.a11, rot.a12, rot.a13, center.x,
+        rot.a21, rot.a22, rot.a23, center.y,
+        rot.a31, rot.a32, rot.a33, center.z,
+              0,       0,       0,        1);
+      tdouble3 p2 = MatrixMulPoint(mat, RelDist);
+      if(CSP.simulate2d)p2.y=Point.y;
+      Point=p2;
+    }
+    else if (TypeParts==TpPartMoving){
+      const StMotionData &motobj=MotObjs->GetMotionData(BodyOffset);
+      if(motobj.type==MOTT_Linear){//-Linear movement.
+        tdouble3 mov=motobj.linmov;
+        tdouble3 p2=Point+mov;
+        if(CSP.simulate2d)p2.y=Point.y;
+        Point=p2;
+      }
+      else if(motobj.type==MOTT_Matrix){//-Matrix movement (for rotations).
+        tdouble3 p2 = MatrixMulPoint(motobj.matmov, Point);
+        if(CSP.simulate2d)p2.y=Point.y;
+        Point=p2;
+      }  
+    }
+  }
+}
+
+#ifdef _WITHGPU
+//==============================================================================
+/// Calculates pressure at indicated points (on GPU).
+//==============================================================================
+void JGaugePressure::CalculeGpu(double timestep,const StDivDataGpu &dvd
+  ,unsigned npbok,unsigned npb,unsigned np,const double2 *posxy,const double *posz
+  ,const typecode *code,const unsigned *idp,const float4 *velrhop,float4 *aux)
+{
+  SetTimeStep(timestep);
+  //-Start measure.
+  tfloat3 ptpres=TFloat3(0);
+  const bool ptout=PointIsOut(Point.x,Point.y,Point.z);//-Verify that the point is within domain boundaries. | Comprueba que el punto este dentro de limites del dominio.
+  if(!ptout){
+    cugauge::Interaction_GaugePres(CSP,dvd,Point,posxy,posz,code,velrhop,(float3*)aux);
+    cudaMemcpy(&ptpres,aux,sizeof(float3),cudaMemcpyDeviceToHost);
+    Check_CudaErroor("Failed in pressure calculation.");
+  }
+  //-Stores result. | Guarda resultado.
+  Result.Set(timestep,ToTFloat3(Point),ptpres.x,ptpres.y);
+  //Log->Printf("------> t:%f",TimeStep);
+  if(Output(timestep))StoreResult();
+}
+
+
+//==============================================================================
+/// Sets the points to the floating or moving body link (on GPU).
+//==============================================================================
+void JGaugePressure::ConfigureLinksGpu(unsigned ftcount,StFloatingData *&ftobjs,double3 *&ftcenterg
+    ,float3 *&ftanglesg,const JDsMotion *dsmotion){
+  if (ActiveLink){
+    switch (TypeParts){
+    case TpPartFixed:{
+      ActiveLink=false;
+      FtObjs=NULL;
+      MotObjs=NULL;
+      FtCenterg=NULL;
+      FtAnglesg=NULL;
+      break;
+    }
+    case TpPartFloating:{
+      MotObjs=NULL;
+      FtObjs=&ftobjs;
+      FtCenterg=&ftcenterg;
+      FtAnglesg=&ftanglesg;
+      unsigned cf=0;
+      for(;cf<ftcount;cf++){
+        if (ftobjs[cf].mkbound==MkBound){
+          BodyOffset=cf;
+          RelDist = Point-ftobjs[cf].center;
+          break;
+        }
+      }
+      if (cf==ftcount) Run_Exceptioon(fun::PrintStr("Floating with mkbound=%u could not be found.",MkBound));
+      break;
+    }
+    case TpPartMoving:{
+      FtObjs=NULL;
+      FtCenterg=NULL;
+      FtAnglesg=NULL;
+      MotObjs=dsmotion;
+      unsigned ref=0;
+      const unsigned nref=dsmotion->GetNumObjects();
+      for(;ref<nref;ref++){
+        const StMotionData& m=dsmotion->GetMotionData(ref);
+        if (m.mkbound==MkBound){
+          BodyOffset=ref;
+          break;
+        }
+      }
+      if (ref==nref) Run_Exceptioon(fun::PrintStr("Moving body with mkbound=%u could not be found.",MkBound));
+      break;
+    }
+    default: Run_Exceptioon("Unsupported supported block type");
+    }
+  }
+}
+
+//==============================================================================
+/// Updates the location of the point if a link is active with Gpu.
+//==============================================================================
+void JGaugePressure::UpdateLinkPointGpu(){
+  if(ActiveLink){
+    if (TypeParts==TpPartFloating){
+      const double3 &ftcenterg=(*FtCenterg)[BodyOffset];
+      const float3 &ftanglesg=(*FtAnglesg)[BodyOffset];
+      tdouble3 center=TDouble3(0);
+      tfloat3 angles=TFloat3(0);
+      cudaMemcpy(&center,&ftcenterg,sizeof(double3),cudaMemcpyDeviceToHost);
+      cudaMemcpy(&angles,&ftanglesg,sizeof(float3),cudaMemcpyDeviceToHost);
+      tmatrix3d rot = fmath::RotMatrix3x3(ToTDouble3(angles));
+      tmatrix4d mat = TMatrix4d(
+        rot.a11, rot.a12, rot.a13, center.x,
+        rot.a21, rot.a22, rot.a23, center.y,
+        rot.a31, rot.a32, rot.a33, center.z,
+              0,       0,       0,        1);
+      tdouble3 p2 = MatrixMulPoint(mat, RelDist);
+      if(CSP.simulate2d)p2.y=Point.y;
+      Point=p2;
+    }
+    else if (TypeParts==TpPartMoving){
+      const StMotionData &motobj=MotObjs->GetMotionData(BodyOffset);
+      if(motobj.type==MOTT_Linear){//-Linear movement.
+        tdouble3 mov=motobj.linmov;
+        tdouble3 p2=Point+mov;
+        if(CSP.simulate2d)p2.y=Point.y;
+        Point=p2;
+      }
+      else if(motobj.type==MOTT_Matrix){//-Matrix movement (for rotations).
+        tdouble3 p2 = MatrixMulPoint(motobj.matmov, Point);
+        if(CSP.simulate2d)p2.y=Point.y;
+        Point=p2;
+      }  
+    }
+  }
+}
+#endif
 
 //##############################################################################
 //# JGaugeSwl
@@ -811,12 +1196,12 @@ void JGaugeSwl::CalculeCpu(double timestep,const StDivDataCpu &dvd
 //==============================================================================
 void JGaugeSwl::CalculeGpu(double timestep,const StDivDataGpu &dvd
   ,unsigned npbok,unsigned npb,unsigned np,const double2 *posxy,const double *posz
-  ,const typecode *code,const unsigned *idp,const float4 *velrhop,float3 *aux)
+  ,const typecode *code,const unsigned *idp,const float4 *velrhop,float4 *aux)
 {
   SetTimeStep(timestep);
   //-Start measure.
   cugauge::Interaction_GaugeSwl(CSP,dvd,Point0,PointDir,PointNp,MassLimit
-    ,posxy,posz,code,velrhop,aux);
+    ,posxy,posz,code,velrhop,(float3*)aux);
   tfloat3 ptsurf=TFloat3(0);
   cudaMemcpy(&ptsurf,aux,sizeof(float3),cudaMemcpyDeviceToHost);
   Check_CudaErroor("Failed in Swl calculation.");
@@ -1020,7 +1405,7 @@ void JGaugeMaxZ::CalculeCpu(double timestep,const StDivDataCpu &dvd
 //==============================================================================
 void JGaugeMaxZ::CalculeGpu(double timestep,const StDivDataGpu &dvd
   ,unsigned npbok,unsigned npb,unsigned np,const double2 *posxy,const double *posz
-  ,const typecode *code,const unsigned *idp,const float4 *velrhop,float3 *aux)
+  ,const typecode *code,const unsigned *idp,const float4 *velrhop,float4 *aux)
 {
   SetTimeStep(timestep);
   //-Compute auxiliary constants.
@@ -1032,7 +1417,7 @@ void JGaugeMaxZ::CalculeGpu(double timestep,const StDivDataGpu &dvd
   GetInteractionCellsMaxZ(Point0,nc,cellzero,cxini,cxfin,yini,yfin,zini,zfin);
   //-Start measure.
   cugauge::Interaction_GaugeMaxz(Point0,maxdist2,dvd
-    ,cxini,cxfin,yini,yfin,zini,zfin,posxy,posz,code,aux);
+    ,cxini,cxfin,yini,yfin,zini,zfin,posxy,posz,code,(float3*)aux);
   tfloat3 ptsurf=TFloat3(0);
   cudaMemcpy(&ptsurf,aux,sizeof(float3),cudaMemcpyDeviceToHost);
   Check_CudaErroor("Failed in MaxZ calculation.");
@@ -1255,7 +1640,7 @@ void JGaugeForce::CalculeCpu(double timestep,const StDivDataCpu &dvd
 //==============================================================================
 void JGaugeForce::CalculeGpu(double timestep,const StDivDataGpu &dvd
   ,unsigned npbok,unsigned npb,unsigned np,const double2 *posxy,const double *posz
-  ,const typecode *code,const unsigned *idp,const float4 *velrhop,float3 *aux)
+  ,const typecode *code,const unsigned *idp,const float4 *velrhop,float4 *aux)
 {
   SetTimeStep(timestep);
   //-Initializes acceleration array to zero.
@@ -1277,386 +1662,5 @@ void JGaugeForce::CalculeGpu(double timestep,const StDivDataGpu &dvd
   Result.Set(timestep,acesum*CSP.massbound);
   //Log->Printf("------> t:%f",TimeStep);
   if(Output(timestep))StoreResult();
-}
-#endif
-
-//##############################################################################
-//# JGaugePressure
-//##############################################################################
-//==============================================================================
-/// Constructor.
-//==============================================================================
-JGaugePressure::JGaugePressure(unsigned idx,std::string name,tdouble3 point
-  ,bool activelink,word mkbound,TpParticles typeparts,bool cpu)
-  :JGaugeItem(GAUGE_Pres,idx,name,cpu)
-{
-  ClassName="JGaugePres";
-  FileInfo=string("Saves pressure data measured from fluid particles (by ")+ClassName+").";
-  Reset();
-  SetPoint(point);
-  ActiveLink=activelink;
-  MkBound=mkbound;
-  TypeParts=typeparts;
-  FtObjs=NULL;
-  MotObjs=NULL;
-  #ifdef _WITHGPU
-  FtCenterg=NULL;
-  FtAnglesg=NULL;
-  #endif
-  RelDist=TDouble3(0);
-}
-
-//==============================================================================
-/// Destructor.
-//==============================================================================
-JGaugePressure::~JGaugePressure(){
-  DestructorActive=true;
-  Reset();
-}
-
-//==============================================================================
-/// Initialisation of variables.
-//==============================================================================
-void JGaugePressure::Reset(){
-  SetPoint(TDouble3(0));
-  ActiveLink=false;
-  MkBound=0;
-  TypeParts=TpPartUnknown;
-  FtObjs=NULL;
-  MotObjs=NULL;
-  #ifdef _WITHGPU
-  FtCenterg=NULL;
-  FtAnglesg=NULL;
-  #endif
-  RelDist=TDouble3(0);
-  JGaugeItem::Reset();
-}
-
-//==============================================================================
-/// Record the last measure result.
-//==============================================================================
-void JGaugePressure::StoreResult(){
-  if(OutputSave){
-    //-Allocates memory.
-    while(unsigned(OutBuff.size())<OutSize)OutBuff.push_back(StGaugePresRes());
-    //-Empty buffer.
-    if(OutCount+1>=OutSize)SaveResults();
-    //-Stores last results.
-    OutBuff[OutCount]=Result;
-    OutCount++;
-    //-Updates OutputNext.
-    if(OutputDt){
-      const unsigned nt=unsigned(TimeStep/OutputDt);
-      OutputNext=OutputDt*nt;
-      if(OutputNext<=TimeStep)OutputNext=OutputDt*(nt+1);
-    }
-  }
-}
-
-//==============================================================================
-/// Saves stored results in CSV file.
-//==============================================================================
-void JGaugePressure::SaveResults(){
-  if(OutCount){
-    const bool first=OutFile.empty();
-    if(first){
-      OutFile=GetResultsFileCsv();
-      Log->AddFileInfo(OutFile,FileInfo);
-    }
-    jcsv::JSaveCsv2 scsv(OutFile,!first,AppInfo.GetCsvSepComa());
-    //-Saves head.
-    if(first){
-      scsv.SetHead();
-      scsv << "time [s];press [Pa];posx [m];posy [m];posz [m];kersum [-]" << jcsv::Endl();
-    }
-    //-Saves data.
-    scsv.SetData();
-    scsv << jcsv::Fmt(jcsv::TpFloat1,"%g") << jcsv::Fmt(jcsv::TpFloat3,"%g;%g;%g") << jcsv::Fmt(jcsv::TpFloat1,"%g");
-    for(unsigned c=0;c<OutCount;c++){
-      scsv << OutBuff[c].timestep << OutBuff[c].pres << OutBuff[c].point << OutBuff[c].sumker << jcsv::Endl();
-    }
-    OutCount=0;
-  }
-}
-
-//==============================================================================
-/// Saves last result in VTK file.
-//==============================================================================
-void JGaugePressure::SaveVtkResult(unsigned cpart){
-  if(JVtkLib::Available()){
-    //-Prepares data.
-    JDataArrays arrays;
-    arrays.AddArray("Pos",1,&(Result.point),false);
-    arrays.AddArray("Pres",1,&(Result.pres),false);
-    Log->AddFileInfo(fun::FileNameSec(GetResultsFileVtk(),UINT_MAX),FileInfo);
-    JVtkLib::SaveVtkData(fun::FileNameSec(GetResultsFileVtk(),cpart),arrays,"Pos");
-  }
-}
-
-//==============================================================================
-/// Loads and returns number definition points.
-//==============================================================================
-unsigned JGaugePressure::GetPointDef(std::vector<tfloat3> &points)const{
-  points.push_back(ToTFloat3(Point));
-  return(1);
-}
-
-//==============================================================================
-/// Calculates pressure at indicated points (on CPU).
-//==============================================================================
-template<TpKernel tker> void JGaugePressure::CalculeCpuT(double timestep
-  ,const StDivDataCpu &dvd,unsigned npbok,unsigned npb,unsigned np,const tdouble3 *pos
-  ,const typecode *code,const unsigned *idp,const tfloat4 *velrhop)
-{
-  SetTimeStep(timestep);
-  //-Start measure.
-  float ptpres=0.0f;
-  float sumker=0.0f;
-  const bool ptout=PointIsOut(Point.x,Point.y,Point.z);//-Verify that the point is within domain boundaries. | Comprueba que el punto este dentro de limites del dominio.
-
-  if(!ptout){
-    //-Auxiliary variables.
-    double sumwab=0;
-    float sumpres=0.0f;
-    //-Search for fluid neighbours in adjacent cells.
-    const StNgSearch ngs=nsearch::Init(Point,false,dvd);
-    for(int z=ngs.zini;z<ngs.zfin;z++)for(int y=ngs.yini;y<ngs.yfin;y++){
-      const tuint2 pif=nsearch::ParticleRange(y,z,ngs,dvd);
-      for(unsigned p2=pif.x;p2<pif.y;p2++){
-        const float rr2=nsearch::Distance2(Point,pos[p2]);
-        //-Interaction with real neighbouring particles.
-        if(rr2<=CSP.kernelsize2 && rr2>=ALMOSTZERO && CODE_IsFluid(code[p2])){
-          float wab=fsph::GetKernel_Wab<tker>(CSP,rr2);
-          tfloat4 velrhop2=velrhop[p2];
-          const float press2=fsph::ComputePress(velrhop2.w,CSP);
-          wab*=CSP.massfluid/velrhop2.w;
-          sumwab+=wab;
-          sumpres+=wab*press2;
-        }
-      }
-    }
-    //-Applies kernel correction.
-    // if(sumwab!=0) sumpres/=sumwab;
-
-    //-Stores result. | Guarda resultado.
-    ptpres=sumpres;
-    sumker=float(sumwab);
-  }
-  //-Stores result. | Guarda resultado.
-  Result.Set(timestep,ToTFloat3(Point),ptpres,sumker);
-  //Log->Printf("------> t:%f",TimeStep);
-  if(Output(timestep))StoreResult();
-}
-
-//==============================================================================
-/// Calculates pressure at indicated points (on CPU).
-//==============================================================================
-void JGaugePressure::CalculeCpu(double timestep,const StDivDataCpu &dvd
-  ,unsigned npbok,unsigned npb,unsigned np,const tdouble3 *pos
-  ,const typecode *code,const unsigned *idp,const tfloat4 *velrhop)
-{
-  switch(CSP.tkernel){
-    case KERNEL_Cubic:       //Kernel Wendland is used since Cubic is not available.
-    case KERNEL_Wendland:    CalculeCpuT<KERNEL_Wendland>  (timestep,dvd,npbok,npb,np,pos,code,idp,velrhop);  break;
-    default: Run_Exceptioon("Kernel unknown.");
-  }
-}
-
-//==============================================================================
-/// Sets the points to the floating or moving body link.
-//==============================================================================
-void JGaugePressure::ConfigureLinks(unsigned ftcount,StFloatingData *&ftobjs,const JDsMotion *dsmotion){
-  if (ActiveLink){
-    switch (TypeParts){
-    case TpPartFixed:{
-      ActiveLink=false;
-      FtObjs=NULL;
-      MotObjs=NULL;
-      break;
-    }
-    case TpPartFloating:{
-      MotObjs=NULL;
-      FtObjs=&ftobjs;
-      unsigned cf=0;
-      for(;cf<ftcount;cf++){
-        if (ftobjs[cf].mkbound==MkBound){
-          BodyOffset=cf;
-          RelDist = Point-ftobjs[cf].center;
-          break;
-        }
-      }
-      if (cf==ftcount) Run_Exceptioon(fun::PrintStr("Floating with mkbound=%u could not be found.",MkBound));
-      break;
-    }
-    case TpPartMoving:{
-      FtObjs=NULL;
-      MotObjs=dsmotion;
-      unsigned ref=0;
-      const unsigned nref=dsmotion->GetNumObjects();
-      for(;ref<nref;ref++){
-        const StMotionData& m=dsmotion->GetMotionData(ref);
-        if (m.mkbound==MkBound){
-          BodyOffset=ref;
-          break;
-        }
-      }
-      if (ref==nref) Run_Exceptioon(fun::PrintStr("Moving body with mkbound=%u could not be found.",MkBound));
-      break;
-    }
-    default: Run_Exceptioon("Unsupported supported block type");
-    }
-  }
-}
-
-//==============================================================================
-/// Updates the location of the point if a link is active.
-//==============================================================================
-void JGaugePressure::UpdateLinkPoint(){
-  if(ActiveLink){
-    if (TypeParts==TpPartFloating){
-      const StFloatingData &ftobj=(*FtObjs)[BodyOffset];
-      tdouble3 center=ftobj.center;
-      tdouble3 angles=ToTDouble3(ftobj.angles);
-      tmatrix3d rot = fmath::RotMatrix3x3(angles);
-      tmatrix4d mat = TMatrix4d(
-        rot.a11, rot.a12, rot.a13, center.x,
-        rot.a21, rot.a22, rot.a23, center.y,
-        rot.a31, rot.a32, rot.a33, center.z,
-              0,       0,       0,        1);
-      tdouble3 p2 = MatrixMulPoint(mat, RelDist);
-      if(CSP.simulate2d)p2.y=Point.y;
-      Point=p2;
-    }
-    else if (TypeParts==TpPartMoving){
-      const StMotionData &motobj=MotObjs->GetMotionData(BodyOffset);
-      if(motobj.type==MOTT_Linear){//-Linear movement.
-        tdouble3 mov=motobj.linmov;
-        tdouble3 p2=Point+mov;
-        if(CSP.simulate2d)p2.y=Point.y;
-        Point=p2;
-      }
-      else if(motobj.type==MOTT_Matrix){//-Matrix movement (for rotations).
-        tdouble3 p2 = MatrixMulPoint(motobj.matmov, Point);
-        if(CSP.simulate2d)p2.y=Point.y;
-        Point=p2;
-      }  
-    }
-  }
-}
-
-#ifdef _WITHGPU
-//==============================================================================
-/// Calculates pressure at indicated points (on GPU).
-//==============================================================================
-void JGaugePressure::CalculeGpu(double timestep,const StDivDataGpu &dvd
-  ,unsigned npbok,unsigned npb,unsigned np,const double2 *posxy,const double *posz
-  ,const typecode *code,const unsigned *idp,const float4 *velrhop,float3 *aux)
-{
-  SetTimeStep(timestep);
-  //-Start measure.
-  tfloat3 ptpres=TFloat3(0);
-  const bool ptout=PointIsOut(Point.x,Point.y,Point.z);//-Verify that the point is within domain boundaries. | Comprueba que el punto este dentro de limites del dominio.
-  if(!ptout){
-    cugauge::Interaction_GaugePres(CSP,dvd,Point,posxy,posz,code,velrhop,aux);
-    cudaMemcpy(&ptpres,aux,sizeof(float3),cudaMemcpyDeviceToHost);
-    Check_CudaErroor("Failed in pressure calculation.");
-  }
-  //-Stores result. | Guarda resultado.
-  Result.Set(timestep,ToTFloat3(Point),ptpres.x,ptpres.y);
-  //Log->Printf("------> t:%f",TimeStep);
-  if(Output(timestep))StoreResult();
-}
-
-
-//==============================================================================
-/// Sets the points to the floating or moving body link (on GPU).
-//==============================================================================
-void JGaugePressure::ConfigureLinksGpu(unsigned ftcount,StFloatingData *&ftobjs,double3 *&ftcenterg
-    ,float3 *&ftanglesg,const JDsMotion *dsmotion){
-  if (ActiveLink){
-    switch (TypeParts){
-    case TpPartFixed:{
-      ActiveLink=false;
-      FtObjs=NULL;
-      MotObjs=NULL;
-      FtCenterg=NULL;
-      FtAnglesg=NULL;
-      break;
-    }
-    case TpPartFloating:{
-      MotObjs=NULL;
-      FtObjs=&ftobjs;
-      FtCenterg=&ftcenterg;
-      FtAnglesg=&ftanglesg;
-      unsigned cf=0;
-      for(;cf<ftcount;cf++){
-        if (ftobjs[cf].mkbound==MkBound){
-          BodyOffset=cf;
-          RelDist = Point-ftobjs[cf].center;
-          break;
-        }
-      }
-      if (cf==ftcount) Run_Exceptioon(fun::PrintStr("Floating with mkbound=%u could not be found.",MkBound));
-      break;
-    }
-    case TpPartMoving:{
-      FtObjs=NULL;
-      FtCenterg=NULL;
-      FtAnglesg=NULL;
-      MotObjs=dsmotion;
-      unsigned ref=0;
-      const unsigned nref=dsmotion->GetNumObjects();
-      for(;ref<nref;ref++){
-        const StMotionData& m=dsmotion->GetMotionData(ref);
-        if (m.mkbound==MkBound){
-          BodyOffset=ref;
-          break;
-        }
-      }
-      if (ref==nref) Run_Exceptioon(fun::PrintStr("Moving body with mkbound=%u could not be found.",MkBound));
-      break;
-    }
-    default: Run_Exceptioon("Unsupported supported block type");
-    }
-  }
-}
-
-//==============================================================================
-/// Updates the location of the point if a link is active with Gpu.
-//==============================================================================
-void JGaugePressure::UpdateLinkPointGpu(){
-  if(ActiveLink){
-    if (TypeParts==TpPartFloating){
-      const double3 &ftcenterg=(*FtCenterg)[BodyOffset];
-      const float3 &ftanglesg=(*FtAnglesg)[BodyOffset];
-      tdouble3 center=TDouble3(0);
-      tfloat3 angles=TFloat3(0);
-      cudaMemcpy(&center,&ftcenterg,sizeof(double3),cudaMemcpyDeviceToHost);
-      cudaMemcpy(&angles,&ftanglesg,sizeof(float3),cudaMemcpyDeviceToHost);
-      tmatrix3d rot = fmath::RotMatrix3x3(ToTDouble3(angles));
-      tmatrix4d mat = TMatrix4d(
-        rot.a11, rot.a12, rot.a13, center.x,
-        rot.a21, rot.a22, rot.a23, center.y,
-        rot.a31, rot.a32, rot.a33, center.z,
-              0,       0,       0,        1);
-      tdouble3 p2 = MatrixMulPoint(mat, RelDist);
-      if(CSP.simulate2d)p2.y=Point.y;
-      Point=p2;
-    }
-    else if (TypeParts==TpPartMoving){
-      const StMotionData &motobj=MotObjs->GetMotionData(BodyOffset);
-      if(motobj.type==MOTT_Linear){//-Linear movement.
-        tdouble3 mov=motobj.linmov;
-        tdouble3 p2=Point+mov;
-        if(CSP.simulate2d)p2.y=Point.y;
-        Point=p2;
-      }
-      else if(motobj.type==MOTT_Matrix){//-Matrix movement (for rotations).
-        tdouble3 p2 = MatrixMulPoint(motobj.matmov, Point);
-        if(CSP.simulate2d)p2.y=Point.y;
-        Point=p2;
-      }  
-    }
-  }
 }
 #endif

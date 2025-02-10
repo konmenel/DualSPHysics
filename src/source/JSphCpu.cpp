@@ -818,7 +818,7 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
           const float p_vpm=prs*massp2/velrhop2.w;
           // const float p_vpm=1.0f*massp2/velrhop2.w; // Gradient of 1
           gradpresp1.x+=p_vpm*frxbar; gradpresp1.y+=p_vpm*frybar; gradpresp1.z+=p_vpm*frzbar;
-          if(Simulate2D)gradpres[p1].y=KGC_IsFSurface(kgcparttype[p1])? 1.0f: 0.0f;
+          if(kgc && Simulate2D)gradpres[p1].y=KGC_IsFSurface(kgcparttype[p1])? 1.0f: 0.0f;
           //! DELETE THIS
 
           //-Density derivative (Continuity equation).

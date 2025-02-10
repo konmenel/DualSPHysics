@@ -697,7 +697,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
       const float prs=(kgc && KGC_IsInteral(kgcparttype[p1])? pressp2-pressp1: pressp1+pressp2);
       const float p_vpm=prs*massp2/velrhop2.w;
       gradpres[p1].x+=p_vpm*frxbar; gradpres[p1].y+=p_vpm*frybar; gradpres[p1].z+=p_vpm*frzbar;
-      if(CTE.simulate2d)gradpres[p1].y=KGC_IsFSurface(kgcparttype[p1])? 1.0f: 0.0f;
+      if(kgc && CTE.simulate2d)gradpres[p1].y=KGC_IsFSurface(kgcparttype[p1])? 1.0f: 0.0f;
       //! DELETE THIS
     }
   }

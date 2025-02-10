@@ -603,7 +603,7 @@ template<TpKernel tker,TpFtMode ftmode,bool lamsps,TpDensity tdensity,bool shift
       if(compute){
         if(kgc && (CTE.tkgc==KGC_BonetLokMinusOp || CTE.tkgc==KGC_ZagoMinusOp)){
           const float pressp2=cufsph::ComputePressCte(velrhop2.w);
-          const float prs=(KGC_IsInteral(kgcparttype[p1])? -pressp1+pressp2: -pressp1+pressp2)/(velrhop1.w*velrhop2.w)
+          const float prs=(KGC_IsInteral(kgcparttype[p1])? -pressp1+pressp2: pressp1+pressp2)/(velrhop1.w*velrhop2.w)
             +(tker==KERNEL_Cubic? cufsph::GetKernelCubic_Tensil(rr2,velrhop1.w,pressp1,velrhop2.w,pressp2): 0);
           const float p_vpm=-prs*(USE_FLOATING? ftmassp2: massp2);
           acep1.x+=p_vpm*frxbar; acep1.y+=p_vpm*frybar; acep1.z+=p_vpm*frzbar;

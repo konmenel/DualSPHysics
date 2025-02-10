@@ -804,7 +804,7 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
           if(compute){
             if(kgc && (TKgc==KGC_BonetLokMinusOp || TKgc==KGC_ZagoMinusOp)){
               const float prs_tensile=(tker==KERNEL_Cubic? fsph::GetKernelCubic_Tensil(CSP,rr2,rhopp1,pressp1,velrhop2.w,press[p2]): 0);
-              const float prs=(KGC_IsInteral(kgcparttype[p1])? press[p2]-pressp1: pressp1+press[p2])/(rhopp1*velrhop2.w) + prs_tensile;
+              const float prs=(KGC_IsInteral(kgcparttype[p1])? -pressp1+press[p2]: -pressp1+press[p2])/(rhopp1*velrhop2.w) + prs_tensile;
               const float p_vpm=-prs*massp2;
               acep1.x+=p_vpm*frxbar; acep1.y+=p_vpm*frybar; acep1.z+=p_vpm*frzbar;
             }else{

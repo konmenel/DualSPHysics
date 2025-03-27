@@ -818,7 +818,7 @@ template<TpKernel tker,TpFtMode ftmode,TpVisco tvisco,TpDensity tdensity,bool sh
           const float p_vpm=prs*massp2/velrhop2.w;
           // const float p_vpm=1.0f*massp2/velrhop2.w; // Gradient of 1
           gradpresp1.x+=p_vpm*frxbar; gradpresp1.y+=p_vpm*frybar; gradpresp1.z+=p_vpm*frzbar;
-          if(kgc && Simulate2D)gradpres[p1].y=(float)kgcparttype[p1];
+          if(kgc && Simulate2D)gradpresp1.y=(float)kgcparttype[p1];
           //! DELETE THIS
 
           //-Density derivative (Continuity equation).
@@ -1073,7 +1073,7 @@ void JSphCpu::ComputeKgcMat(unsigned n,unsigned pini, const tdouble3 *pos,const 
     #pragma omp parallel for schedule (static)
   #endif
   for(int p1=int(pini);p1<pfin;p1++){
-    float fsp1=0;
+    float fsp1=0.0f;
     //-Obtain data of particle p1.
     const tdouble3 posp1=pos[p1];
 

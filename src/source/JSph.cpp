@@ -179,7 +179,7 @@ void JSph::InitVars(){
   ShiftingMode=(Shifting? Shifting->GetShiftMode(): SHIFT_None);
   TKgc=KGC_None;
   TKgcFs=KGC_NoBound;
-  KgcThreshold=0.6;
+  KgcThreshold=0.0;
   Visco=0; ViscoBoundFactor=1;
   TBoundary=BC_DBC;
   SlipMode=SLIP_Vel0;

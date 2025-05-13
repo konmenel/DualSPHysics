@@ -2258,6 +2258,7 @@ void JSph::InitRun(unsigned np,const unsigned* idp,const tdouble3* pos){
     ,Map_PosMin,Map_PosMin,Map_PosMax);
   if(xml.GetNodeSimple("case.execution.special.gauges",true))
     GaugeSystem->LoadXml(&xml,"case.execution.special.gauges",MkInfo);
+  GaugeSystem->ConfigureLinks(FtCount,FtObjs,DsMotion);
 
   //-Prepares WaveGen configuration.
   if(WaveGen){

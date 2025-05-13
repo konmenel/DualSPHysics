@@ -317,18 +317,13 @@ JGaugePointLink::JGaugePointLink(TpGauge type,unsigned idx,std::string name,tdou
     ,bool activelink,word mkbound,TpParticles typeparts
     ,int gpucount):JGaugeItem(type,idx,name,gpucount)
 {
-  ClassName="JGaugeVel";
-  FileInfo=string("Saves velocity data measured from fluid particles (by ")+ClassName+").";
   Reset();
   SetPoint(point);
+  ActiveLink=activelink;
   MkBound=mkbound;
   TypeParts=typeparts;
   FtObjs=NULL;
   MotObjs=NULL;
-  #ifdef _WITHGPU
-  FtCenterg=NULL;
-  FtAnglesg=NULL;
-  #endif
   RelDist=TDouble3(0);
 }
 
@@ -359,8 +354,8 @@ void JGaugePointLink::ConfigureLinks(unsigned ftcount,const StFloatingData *ftob
       ActiveLink=false;
       FtObjs=NULL;
       MotObjs=NULL;
-      break;
     }
+    break;
     case TpPartFloating:{
       MotObjs=NULL;
       FtObjs=ftobjs;
@@ -373,8 +368,8 @@ void JGaugePointLink::ConfigureLinks(unsigned ftcount,const StFloatingData *ftob
         }
       }
       if (cf==ftcount) Run_Exceptioon(fun::PrintStr("Floating with mkbound=%u could not be found.",MkBound));
-      break;
     }
+    break;
     case TpPartMoving:{
       FtObjs=NULL;
       MotObjs=dsmotion;
@@ -388,8 +383,8 @@ void JGaugePointLink::ConfigureLinks(unsigned ftcount,const StFloatingData *ftob
         }
       }
       if (ref==nref) Run_Exceptioon(fun::PrintStr("Moving body with mkbound=%u could not be found.",MkBound));
-      break;
     }
+    break;
     default: Run_Exceptioon("Unsupported supported block type");
     }
   }
@@ -431,97 +426,6 @@ void JGaugePointLink::UpdateLinkPoint(){
   }
 }
 
-#ifdef _WITHGPU
-void JGaugePointLink::ConfigureLinksGpu(unsigned ftcount,const StFloatingData *ftobjs,const double3 *ftcenterg
-  ,const float3 *ftanglesg,const JDsMotion *dsmotion){
-if (ActiveLink){
-  switch (TypeParts){
-  case TpPartFixed:{
-    ActiveLink=false;
-    FtObjs=NULL;
-    MotObjs=NULL;
-    FtCenterg=NULL;
-    FtAnglesg=NULL;
-    break;
-  }
-  case TpPartFloating:{
-    MotObjs=NULL;
-    FtObjs=ftobjs;
-    FtCenterg=ftcenterg;
-    FtAnglesg=ftanglesg;
-    unsigned cf=0;
-    for(;cf<ftcount;cf++){
-      if (ftobjs[cf].mkbound==MkBound){
-        BodyOffset=cf;
-        RelDist = Point-ftobjs[cf].center;
-        break;
-      }
-    }
-    if (cf==ftcount) Run_Exceptioon(fun::PrintStr("Floating with mkbound=%u could not be found.",MkBound));
-    break;
-  }
-  case TpPartMoving:{
-    FtObjs=NULL;
-    FtCenterg=NULL;
-    FtAnglesg=NULL;
-    MotObjs=dsmotion;
-    unsigned ref=0;
-    const unsigned nref=dsmotion->GetNumObjects();
-    for(;ref<nref;ref++){
-      const StMotionData& m=dsmotion->GetMotionData(ref);
-      if (m.mkbound==MkBound){
-        BodyOffset=ref;
-        break;
-      }
-    }
-    if (ref==nref) Run_Exceptioon(fun::PrintStr("Moving body with mkbound=%u could not be found.",MkBound));
-    break;
-  }
-  default: Run_Exceptioon("Unsupported supported block type");
-  }
-}
-}
-
-//==============================================================================
-/// Updates the location of the point if a link is active with Gpu.
-//==============================================================================
-void JGaugePointLink::UpdateLinkPointGpu(){
-if(ActiveLink){
-  if (TypeParts==TpPartFloating){
-    const double3 &ftcenterg=FtCenterg[BodyOffset];
-    const float3 &ftanglesg=FtAnglesg[BodyOffset];
-    tdouble3 center=TDouble3(0);
-    tfloat3 angles=TFloat3(0);
-    cudaMemcpy(&center,&ftcenterg,sizeof(double3),cudaMemcpyDeviceToHost);
-    cudaMemcpy(&angles,&ftanglesg,sizeof(float3),cudaMemcpyDeviceToHost);
-    tmatrix3d rot = fmath::RotMatrix3x3(ToTDouble3(angles));
-    tmatrix4d mat = TMatrix4d(
-      rot.a11, rot.a12, rot.a13, center.x,
-      rot.a21, rot.a22, rot.a23, center.y,
-      rot.a31, rot.a32, rot.a33, center.z,
-            0,       0,       0,        1);
-    tdouble3 p2 = MatrixMulPoint(mat, RelDist);
-    if(CSP.simulate2d)p2.y=Point.y;
-    Point=p2;
-  }
-  else if (TypeParts==TpPartMoving){
-    const StMotionData &motobj=MotObjs->GetMotionData(BodyOffset);
-    if(motobj.type==MOTT_Linear){//-Linear movement.
-      tdouble3 mov=motobj.linmov;
-      tdouble3 p2=Point+mov;
-      if(CSP.simulate2d)p2.y=Point.y;
-      Point=p2;
-    }
-    else if(motobj.type==MOTT_Matrix){//-Matrix movement (for rotations).
-      tdouble3 p2 = MatrixMulPoint(motobj.matmov, Point);
-      if(CSP.simulate2d)p2.y=Point.y;
-      Point=p2;
-    }  
-  }
-}
-}
-#endif
-
 //##############################################################################
 //# JGaugeVelocity
 //##############################################################################
@@ -537,6 +441,7 @@ JGaugeVelocity::JGaugeVelocity(unsigned idx,std::string name,tdouble3 point
   ClassName="JGaugeVelocity";
   FileInfo=string("Saves velocity data measured from fluid particles (by ")+ClassName+").";
   Reset();
+  SetPoint(point);
 }
 
 //==============================================================================
@@ -799,8 +704,9 @@ JGaugePressure::JGaugePressure(unsigned idx,std::string name,tdouble3 point
     ,gpucount)
 {
 ClassName="JGaugePressure";
-FileInfo=string("Saves velocity data measured from fluid particles (by ")+ClassName+").";
+FileInfo=string("Saves pressure data measured from fluid particles (by ")+ClassName+").";
 Reset();
+SetPoint(point);
 }
 
 //==============================================================================

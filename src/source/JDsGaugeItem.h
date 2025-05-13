@@ -279,11 +279,6 @@ public:
   virtual void ConfigureLinks(unsigned ftcount,const StFloatingData *ftobjs
     ,const JDsMotion *dsmotion){};
   virtual void UpdateLinkPoint(){};
-  #ifdef _WITHGPU
-  virtual void ConfigureLinksGpu(unsigned ftcount,const StFloatingData *ftobjs,const double3 *ftcenterg
-    ,const float3 *ftanglesg,const JDsMotion *dsmotion){};
-  virtual void UpdateLinkPointGpu(){};
-  #endif
 
   virtual void CalculeCpu(const StDataCpu& datacpu)=0;
 
@@ -316,10 +311,6 @@ protected:
   size_t BodyOffset;            //<The offset of the floating or moving body in the arrays below.
   const StFloatingData *FtObjs; //<The floating data array (NULL if link is to moving boundary)
   const JDsMotion *MotObjs;     //<The motion's data array (NULL if link is to floating body)
-  #ifdef _WITHGPU
-  const double3 *FtCenterg;     //<The center of the floating in GPU (NULL if link is to moving boundary)
-  const float3 *FtAnglesg;      //<The euler angles of the floating in GPU (NULL if link is to moving boundary)
-  #endif
 
 public:
   JGaugePointLink(TpGauge type,unsigned idx,std::string name,tdouble3 point
@@ -332,17 +323,12 @@ public:
   void ConfigureLinks(unsigned ftcount,const StFloatingData *ftobjs
     ,const JDsMotion *dsmotion)override;
   void UpdateLinkPoint()override;
-  #ifdef _WITHGPU
-  void ConfigureLinksGpu(unsigned ftcount,const StFloatingData *ftobjs,const double3 *ftcenterg
-    ,const float3 *ftanglesg,const JDsMotion *dsmotion)override;
-  void UpdateLinkPointGpu()override;
-  #endif
 
   tdouble3 GetPoint()const{ return(Point); }
   bool     IsLinkActive()const{ return(ActiveLink); }
   word     GetMkBound()   const{ return(MkBound); }
   TpParticles GetTypeParts()const{ return(TypeParts); }
-  virtual void SetPoint(const tdouble3& point){ Point=point; }
+  void SetPoint(const tdouble3& point){ Point=point; }
 
 };
 
@@ -416,7 +402,7 @@ public:
 
   const StGaugeVelRes& GetResult()const{ return(Result); }
 
-  virtual void SetPoint(const tdouble3& point)override{ ClearResult(); JGaugePointLink::SetPoint(point); }
+  void SetPoint(const tdouble3& point){ ClearResult(); Point=point; }
   template<TpKernel tker> void CalculeCpuT(const StDataCpu& datacpu);
   void CalculeCpu(const StDataCpu& datacpu);
 
@@ -497,7 +483,7 @@ JGaugePressure(unsigned idx,std::string name,tdouble3 point
   unsigned GetPointDef(std::vector<tfloat3>& points)const;
 
   const StrGaugePresRes& GetResult()const{ return(Result); }
-  virtual void SetPoint(const tdouble3& point)override{ ClearResult(); JGaugePointLink::SetPoint(point); }
+  void SetPoint(const tdouble3& point){ ClearResult(); Point=point; }
 
   template<TpKernel tker> void CalculeCpuT(const StDataCpu& datacpu);
   void CalculeCpu(const StDataCpu& datacpu);

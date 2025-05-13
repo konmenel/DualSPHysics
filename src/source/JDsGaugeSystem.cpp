@@ -664,6 +664,7 @@ void JGaugeSystem::CalculeCpu(double timestep,const StDivDataCpu& dvd
   DataCpu.SetDivState(timestep,dvd,npbok,npb,np);
   for(unsigned cg=0;cg<ng;cg++){
     JGaugeItem* gau=Gauges[cg];
+    gau->UpdateLinkPoint();
     if(gau->Update(timestep))gau->CalculeCpu(DataCpu);
   }
   //-Clear divide state.
@@ -703,6 +704,7 @@ void JGaugeSystem::CalculeGpu(int id,double timestep,const StDivDataGpu& dvd
   DataGpu[id].SetDivState(timestep,dvd,npbok,npb,np);
   for(unsigned cg=0;cg<ng;cg++){
     JGaugeItem* gau=Gauges[cg];
+    gau->UpdateLinkPoint();
     if(gau->Update(timestep))gau->CalculeGpu(DataGpu[id]);
   }
   //-Clear divide state.
@@ -741,3 +743,13 @@ void JGaugeSystem::SaveResults(unsigned cpart){
   for(unsigned cg=0;cg<ng;cg++)Gauges[cg]->SaveResults(cpart);
 }
 
+//==============================================================================
+/// Configures the links for the gauges if link is active.
+//==============================================================================
+void JGaugeSystem::ConfigureLinks(unsigned ftcount,const StFloatingData *ftobjs,const JDsMotion *dsmotion){
+  const unsigned ng=GetCount();
+  for(unsigned cg=0;cg<ng;cg++){
+    JGaugeItem* gau=Gauges[cg];
+    gau->ConfigureLinks(ftcount,ftobjs,dsmotion);
+  }
+}

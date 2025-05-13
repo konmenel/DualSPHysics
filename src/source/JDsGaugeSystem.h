@@ -153,6 +153,8 @@ public:
   unsigned GetGaugeIdx(const std::string& name)const;
   JGaugeItem* GetGauge(unsigned c)const;
 
+  void ConfigureLinks(unsigned ftcount,const StFloatingData *ftobjs,const JDsMotion* dsmotion);
+
   void CalculeCpu(double timestep,const StDivDataCpu& dvd
     ,unsigned npbok,unsigned npb,unsigned np,bool savedivstate=false);
 

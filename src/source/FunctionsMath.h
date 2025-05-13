@@ -354,6 +354,21 @@ inline tmatrix3f RotMatrix3x3(const tfloat3& ang){
 
 
 //==============================================================================
+/// Devuelve la matriz de rotacion.
+/// Returns the rotation matrix.
+//==============================================================================
+inline tmatrix3d RotMatrix3x3(const tdouble3& ang){
+  const float cosx=cos(ang.x),cosy=cos(ang.y),cosz=cos(ang.z);
+  const float sinx=sin(ang.x),siny=sin(ang.y),sinz=sin(ang.z);
+  return(TMatrix3d(
+     cosy*cosz,                   -cosy*sinz,                    siny,
+     sinx*siny*cosz + cosx*sinz,  -sinx*siny*sinz + cosx*cosz,  -sinx*cosy,
+    -cosx*siny*cosz + sinx*sinz,   cosx*siny*sinz + sinx*cosz,   cosx*cosy
+  ));
+}
+
+
+//==============================================================================
 /// Returns cotangent of angle in radians.
 //==============================================================================
 inline double cot(double z){ return(1.0 / tan(z)); }

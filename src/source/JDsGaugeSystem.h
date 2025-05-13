@@ -135,7 +135,9 @@ public:
   void LoadLinePoints(unsigned count,const tdouble3& point1,const tdouble3& point2,std::vector<tdouble3>& points)const{ LoadLinePoints(count,point1,point2,points,""); }
 
   JGaugeVelocity* AddGaugeVel  (std::string name,double computestart,double computeend,double computedt,bool fixed
-    ,const tdouble3& point);
+    ,const JSphMk* mkinfo,word mkbound,const tdouble3& point);
+  JGaugePressure* AddGaugePres (std::string name,double computestart,double computeend,double computedt,bool fixed
+      ,const JSphMk* mkinfo,word mkbound,const tdouble3& point);
   JGaugeSwl*      AddGaugeSwl  (std::string name,double computestart,double computeend,double computedt,bool fixed
     ,tdouble3 point0,tdouble3 point2,double pointdp,float masslimit=0);
   JGaugeMaxZ*     AddGaugeMaxZ (std::string name,double computestart,double computeend,double computedt,bool fixed

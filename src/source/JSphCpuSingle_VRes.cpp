@@ -455,8 +455,8 @@ double JSphCpuSingle_VRes::ComputeStepVRes(){
 /// Complete time step of VRes simulation.
 //==============================================================================
 void JSphCpuSingle_VRes::Finish(double dt1){
-	RunGaugeSystem(TimeStep+dt1);
-	if(CaseNmoving)RunMotion(dt1);
+  if(CaseNmoving)RunMotion(dt1);
+	RunGaugeSystem(TimeStep+dt1); //GaugeSystem should be run after motion is applied
 	if(InOut)InOutComputeStep(dt1);
 	else RunCellDivide(true);
   if(FlexStruc)UpdateFlexStrucGeometry();

@@ -261,8 +261,15 @@ void JGaugeSystem::ReadXml(const JXml* sxml,TiXmlElement* lis,const JSphMk* mkin
         JGaugeItem* gau=NULL;
         if(cmd=="velocity"){
           const tdouble3 point=sxml->ReadElementDouble3(ele,"point");
+          const word mkbound=(word)sxml->ReadElementUnsigned(ele,"link","mkbound",true,USHRT_MAX);
           gau=AddGaugeVel(name,cfg.computestart,cfg.computeend,cfg.computedt
-            ,true,point);
+            ,true,mkinfo,mkbound,point);
+        }
+        else if(cmd=="pressure"){
+          const tdouble3 point=sxml->ReadElementDouble3(ele,"point");
+          const word mkbound=(word)sxml->ReadElementUnsigned(ele,"link","mkbound",true,USHRT_MAX);
+          gau=AddGaugePres(name,cfg.computestart,cfg.computeend,cfg.computedt
+            ,true,mkinfo,mkbound,point);
         }
         else if(cmd=="swl"){
           //-Reads masslimit.
@@ -381,11 +388,69 @@ void JGaugeSystem::ReadXml(const JXml* sxml,TiXmlElement* lis,const JSphMk* mkin
 /// Creates new gauge-Velocity and returns pointer.
 //==============================================================================
 JGaugeVelocity* JGaugeSystem::AddGaugeVel(std::string name,double computestart
-  ,double computeend,double computedt,bool fixed,const tdouble3& point)
+  ,double computeend,double computedt,bool fixed
+  ,const JSphMk* mkinfo,word mkbound,const tdouble3& point)
 {
   if(GetGaugeIdx(name)!=UINT_MAX)Run_Exceptioon(fun::PrintStr("The name \'%s\' already exists.",name.c_str()));
+
+  // Configure link
+  bool activelink=(mkbound!=USHRT_MAX);
+  TpParticles typeparts=TpPartUnknown;
+  if(activelink){
+    const unsigned cmk=mkinfo->GetMkBlockByMkBound(mkbound);
+    if(cmk>=mkinfo->Size())Run_Exceptioon(fun::PrintStr("Error loading boundary objects. Mkbound=%u is unknown.",mkbound));
+    const JSphMkBlock* mkb=mkinfo->Mkblock(cmk);
+    typeparts=mkb->Type;
+    if(typeparts!=TpPartFloating && typeparts!=TpPartMoving && typeparts!=TpPartFixed)
+      Run_Exceptioon(fun::PrintStr("Type of boundary particles (Mkbound=%u) is invalid. Only floating or moving particles are allowed.",mkbound));
+    
+    if(typeparts==TpPartFixed){
+      activelink=false;
+      Log->PrintWarning(fun::PrintStr("Type of boundary particles (Mkbound=%u) is fixed. Link Ignored.",mkbound));
+    }
+  }
+
   //-Creates object.
-  JGaugeVelocity* gau=new JGaugeVelocity(GetCount(),name,point,GpuCount);
+  JGaugeVelocity* gau=new JGaugeVelocity(GetCount(),name,point,activelink,mkbound,typeparts,GpuCount);
+  gau->Config(CSP,Scell,ScellDiv,MapPosMin,DomPosMin,DomPosMax);
+  gau->ConfigDomMCel(fixed);
+  gau->ConfigComputeTiming(computestart,computeend,computedt);
+  //-Uses common configuration.
+  gau->SetSaveVtkPart(CfgDefault.savevtkpart);
+  gau->ConfigOutputTiming(CfgDefault.output,CfgDefault.outputstart
+    ,CfgDefault.outputend,CfgDefault.outputdt);
+  Gauges.push_back(gau);
+  return(gau);
+}
+
+//==============================================================================
+/// Creates new gauge-Pressure and returns pointer.
+//==============================================================================
+JGaugePressure* JGaugeSystem::AddGaugePres(std::string name,double computestart
+  ,double computeend,double computedt,bool fixed
+  ,const JSphMk* mkinfo,word mkbound,const tdouble3& point)
+{
+  if(GetGaugeIdx(name)!=UINT_MAX)Run_Exceptioon(fun::PrintStr("The name \'%s\' already exists.",name.c_str()));
+
+  // Configure link
+  bool activelink=(mkbound!=USHRT_MAX);
+  TpParticles typeparts=TpPartUnknown;
+  if(activelink){
+    const unsigned cmk=mkinfo->GetMkBlockByMkBound(mkbound);
+    if(cmk>=mkinfo->Size())Run_Exceptioon(fun::PrintStr("Error loading boundary objects. Mkbound=%u is unknown.",mkbound));
+    const JSphMkBlock* mkb=mkinfo->Mkblock(cmk);
+    typeparts=mkb->Type;
+    if(typeparts!=TpPartFloating && typeparts!=TpPartMoving && typeparts!=TpPartFixed)
+      Run_Exceptioon(fun::PrintStr("Type of boundary particles (Mkbound=%u) is invalid. Only floating or moving particles are allowed.",mkbound));
+    
+    if(typeparts==TpPartFixed){
+      activelink=false;
+      Log->PrintWarning(fun::PrintStr("Type of boundary particles (Mkbound=%u) is fixed. Link Ignored.",mkbound));
+    }
+  }
+
+  //-Creates object.
+  JGaugePressure* gau=new JGaugePressure(GetCount(),name,point,activelink,mkbound,typeparts,GpuCount);
   gau->Config(CSP,Scell,ScellDiv,MapPosMin,DomPosMin,DomPosMax);
   gau->ConfigDomMCel(fixed);
   gau->ConfigComputeTiming(computestart,computeend,computedt);
@@ -479,7 +544,7 @@ JGaugeForce* JGaugeSystem::AddGaugeForce(std::string name,double computestart
   if(cmk>=mkinfo->Size())Run_Exceptioon(fun::PrintStr("Error loading boundary objects. Mkbound=%u is unknown.",mkbound));
   const JSphMkBlock* mkb=mkinfo->Mkblock(cmk);
   const TpParticles typeparts=mkb->Type;
-  if(typeparts!=TpPartFixed && typeparts!=TpPartMoving)
+  if(typeparts!=TpPartFixed && typeparts!=TpPartMoving && typeparts!=TpPartFloating)
     Run_Exceptioon(fun::PrintStr("Type of boundary particles (Mkbound=%u) is invalid. Only fixed or moving particles are allowed.",mkbound));
   const unsigned idbegin=mkb->Begin;
   const unsigned count=mkb->Count;

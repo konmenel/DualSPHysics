@@ -1000,8 +1000,8 @@ void JSphGpuSingle::Run(std::string appname,const JSphCfgRun* cfg,JLog2* log){
     if(ViscoTime)Visco=ViscoTime->GetVisco(float(TimeStep));
     if(DDTRamp.x)RunInitialDDTRamp(); //<vs_ddramp>
     const double stepdt=ComputeStep();
-    RunGaugeSystem(TimeStep+stepdt);
     if(CaseNmoving)RunMotion(stepdt);
+    RunGaugeSystem(TimeStep+stepdt); //GaugeSystem should be run after motion is applied
     if(InOut)InOutComputeStep(stepdt);
     else RunCellDivide(true);
     if(FlexStruc)UpdateFlexStrucGeometry();

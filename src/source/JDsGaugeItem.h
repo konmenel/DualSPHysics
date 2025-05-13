@@ -39,6 +39,7 @@
 #include "JArraysCpu.h"
 #include "JCellDivDataCpu.h"
 #include "JMeshDataDef.h" //<vs_meeshdat>
+#include "JDsMotion.h"
 
 #ifdef _WITHGPU
 #include "JArraysGpu.h"
@@ -77,6 +78,7 @@ public:
   ///Types of gauges.
   typedef enum{ 
      GAUGE_Vel
+    ,GAUGE_Pres
     ,GAUGE_Swl
     ,GAUGE_MaxZ
     ,GAUGE_Mesh   //<vs_meeshdat>
@@ -274,6 +276,15 @@ public:
   bool Update(double timestep)const{ return(timestep>=ComputeNext && ComputeStart<=timestep && timestep<=ComputeEnd); }
   bool Output(double timestep)const{ return(OutputSave && timestep>=OutputNext && OutputStart<=timestep && timestep<=OutputEnd); }
 
+  virtual void ConfigureLinks(unsigned ftcount,const StFloatingData *ftobjs
+    ,const JDsMotion *dsmotion){};
+  virtual void UpdateLinkPoint(){};
+  #ifdef _WITHGPU
+  virtual void ConfigureLinksGpu(unsigned ftcount,const StFloatingData *ftobjs,const double3 *ftcenterg
+    ,const float3 *ftanglesg,const JDsMotion *dsmotion){};
+  virtual void UpdateLinkPointGpu(){};
+  #endif
+
   virtual void CalculeCpu(const StDataCpu& datacpu)=0;
 
  #ifdef _WITHGPU
@@ -284,19 +295,70 @@ public:
  #endif
 };
 
+//##############################################################################
+//# JGaugePointLink
+//##############################################################################
+/// \brief Base class for point gauge that stays fixed relative to moving or
+///    floating body.
+class JGaugePointLink : public JGaugeItem
+{
+protected:
+  //-Definition.
+  tdouble3 Point;
+
+  // Data for link
+  bool ActiveLink;              //True of link is valid (i.e. to floating or moving boudnary)
+  word MkBound;                 //<The mk value of the boundary
+  TpParticles TypeParts;        //<Type of the link particles (Floating or Moving)
+  tdouble3 RelDist;             //<Relative distance to floating (if link is to a floating)
+  
+  // NOTE: Need double pointer is they arrays are allowed to be reshaped. I don't think it is the case.
+  size_t BodyOffset;            //<The offset of the floating or moving body in the arrays below.
+  const StFloatingData *FtObjs; //<The floating data array (NULL if link is to moving boundary)
+  const JDsMotion *MotObjs;     //<The motion's data array (NULL if link is to floating body)
+  #ifdef _WITHGPU
+  const double3 *FtCenterg;     //<The center of the floating in GPU (NULL if link is to moving boundary)
+  const float3 *FtAnglesg;      //<The euler angles of the floating in GPU (NULL if link is to moving boundary)
+  #endif
+
+public:
+  JGaugePointLink(TpGauge type,unsigned idx,std::string name,tdouble3 point
+    ,bool activelink,word mkbound,TpParticles typeparts
+    ,int gpucount);
+  ~JGaugePointLink();
+
+  void Reset();
+
+  void ConfigureLinks(unsigned ftcount,const StFloatingData *ftobjs
+    ,const JDsMotion *dsmotion)override;
+  void UpdateLinkPoint()override;
+  #ifdef _WITHGPU
+  void ConfigureLinksGpu(unsigned ftcount,const StFloatingData *ftobjs,const double3 *ftcenterg
+    ,const float3 *ftanglesg,const JDsMotion *dsmotion)override;
+  void UpdateLinkPointGpu()override;
+  #endif
+
+  tdouble3 GetPoint()const{ return(Point); }
+  bool     IsLinkActive()const{ return(ActiveLink); }
+  word     GetMkBound()   const{ return(MkBound); }
+  TpParticles GetTypeParts()const{ return(TypeParts); }
+  virtual void SetPoint(const tdouble3& point){ Point=point; }
+
+};
+
 
 //##############################################################################
 //# JGaugeVelocity
 //##############################################################################
 /// \brief Calculates velocity in fluid domain.
-class JGaugeVelocity : public JGaugeItem
+class JGaugeVelocity : public JGaugePointLink
 {
 private:
  #ifdef _WITHGPU
   ///Structure with auxiliary memory for execution on GPU.
   typedef struct StrGaugeVelDataGpu{
     bool GpuMemory;     ///<Indicates when GPU memory is allocated.
-    float3* Resultg;    ///<Stores final result from GPU [1].
+    float4* Resultg;    ///<Stores final result from GPU [1].
     //-Methods.
     StrGaugeVelDataGpu(){
       GpuMemory=false;
@@ -311,21 +373,19 @@ public:
     double timestep;
     tfloat3 point;
     tfloat3 vel;
+    float sumwab;
     bool modified;
     StrGaugeVelRes(){ Reset(); }
     void Reset(){
-      Set(0,TFloat3(0),TFloat3(0));
+      Set(0,TFloat3(0),TFloat3(0),0.0f);
       modified=false;
     }
-    void Set(double t,const tfloat3& pt,const tfloat3& vel){
-      timestep=t; point=pt; this->vel=vel; modified=true;
+    void Set(double t,const tfloat3& pt,const tfloat3& vel, float sumwab){
+      timestep=t; point=pt; this->vel=vel; this->sumwab=sumwab; modified=true;
     }
   }StGaugeVelRes;
 
 protected:
-  //-Definition.
-  tdouble3 Point;
-
   //-Auxiliary variables for GPU execution.
  #ifdef _WITHGPU
   StGaugeVelDataGpu AuxDataGpu[MAXGPUS];
@@ -345,6 +405,7 @@ protected:
 
 public:
   JGaugeVelocity(unsigned idx,std::string name,tdouble3 point
+    ,bool activelink,word mkbound,TpParticles typeparts
     ,int gpucount);
   ~JGaugeVelocity();
   void ConfigDomMCel(bool fixed);
@@ -353,10 +414,90 @@ public:
   void SaveVtkResult(unsigned cpart);
   unsigned GetPointDef(std::vector<tfloat3>& points)const;
 
-  tdouble3 GetPoint()const{ return(Point); }
   const StGaugeVelRes& GetResult()const{ return(Result); }
 
-  void SetPoint(const tdouble3& point){ ClearResult(); Point=point; }
+  virtual void SetPoint(const tdouble3& point)override{ ClearResult(); JGaugePointLink::SetPoint(point); }
+  template<TpKernel tker> void CalculeCpuT(const StDataCpu& datacpu);
+  void CalculeCpu(const StDataCpu& datacpu);
+
+ #ifdef _WITHGPU
+  bool AllocatedGpuMemory(int id)const;
+  void FreeGpuMemory(int id);
+  void AllocGpuMemory(int id);
+  void CalculeGpu(const StDataGpu& datagpu);
+ #endif
+};
+
+
+//##############################################################################
+//# JGaugePressure
+//##############################################################################
+/// \brief Calculates pressure in fluid domain.
+class JGaugePressure : public JGaugePointLink
+{
+private:
+ #ifdef _WITHGPU
+  ///Structure with auxiliary memory for execution on GPU.
+  typedef struct StrGaugePresDataGpu{
+    bool GpuMemory;     ///<Indicates when GPU memory is allocated.
+    float2* Resultg;    ///<Stores final result from GPU [1].
+    //-Methods.
+    StrGaugePresDataGpu(){
+      GpuMemory=false;
+      Resultg=NULL;
+    }
+  }StGaugePresDataGpu;
+ #endif
+
+public:
+  ///Structure with result of JGaugeVelocity object.
+  typedef struct StrGaugePresRes{
+    double timestep;
+    tfloat3 point;
+    float pres;
+    float sumwab;
+    bool modified;
+    StrGaugePresRes(){ Reset(); }
+    void Reset(){
+      Set(0,TFloat3(0),0.0f,0.0f);
+      modified=false;
+    }
+    void Set(double t,const tfloat3& pt,float pres, float sumwab){
+      timestep=t; point=pt; this->pres=pres; this->sumwab=sumwab; modified=true;
+    }
+  }StrGaugePresRes;
+
+protected:
+  //-Auxiliary variables for GPU execution.
+ #ifdef _WITHGPU
+ StrGaugePresDataGpu AuxDataGpu[MAXGPUS];
+ #endif
+
+  //-Result variables.
+  StrGaugePresRes Result;      ///<Result of the last measure.
+  std::vector<StrGaugePresRes> OutBuff; ///<Results in buffer.
+
+  void Reset();
+ #ifdef _WITHGPU
+  void ResetGpuMemory();
+ #endif
+
+  void ClearResult(){ Result.Reset(); }
+  void StoreResult();
+
+public:
+JGaugePressure(unsigned idx,std::string name,tdouble3 point
+    ,bool activelink,word mkbound,TpParticles typeparts
+    ,int gpucount);
+  ~JGaugePressure();
+  void ConfigDomMCel(bool fixed);
+
+  void SaveResults();
+  void SaveVtkResult(unsigned cpart);
+  unsigned GetPointDef(std::vector<tfloat3>& points)const;
+
+  const StrGaugePresRes& GetResult()const{ return(Result); }
+  virtual void SetPoint(const tdouble3& point)override{ ClearResult(); JGaugePointLink::SetPoint(point); }
 
   template<TpKernel tker> void CalculeCpuT(const StDataCpu& datacpu);
   void CalculeCpu(const StDataCpu& datacpu);

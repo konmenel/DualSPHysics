@@ -411,6 +411,9 @@ protected:
   unsigned PartOut;       ///<Total number of excluded particles. | Numero total de particulas excluidas al grabar el ultimo PART.
   double TimeStepIni;     ///<Initial instant of the simulation. | Instante inicial de la simulacion.
   double TimeStep;        ///<Current instant of the simulation. | Instante actual de la simulacion.                                 
+#ifdef _WITHAETA
+  double TimeSegL10[10];  ///<The time/sec of the last ten PARTs
+#endif
   double TimeStepM1;      ///<Instant of the simulation when the last PART was stored. | Instante de la simulacion en que se grabo el ultimo PART.         
   double TimePartNext;    ///<Instant to store next PART file.   | Instante para grabar siguiente fichero PART.
   double LastDt;          ///<Last dt value added to TimeStep. | Ultimo valor de dt sumado a TimeStep.

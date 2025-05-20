@@ -3235,7 +3235,18 @@ void JSph::SaveData(unsigned npsave,const JDataArrays& arrays
     const double tseg=tpart/(TimeStep-TimeStepM1);
     TimerSim.Stop();
     const double tcalc=TimerSim.GetSecs();
-    const double tleft=(tcalc/(TimeStep-TimeStepIni))*(TimeMax-TimeStep);
+    #ifdef _WITHAETA
+      size_t n=sizeof(TimeSegL10)/sizeof(TimeSegL10[0]);
+      for (size_t i=n-1;i>0;i--) TimeSegL10[i]=TimeSegL10[i-1];
+      TimeSegL10[0]=tseg;
+      double tsegav=0;
+      size_t nparts=(n < Part) ? n : Part;
+      for (size_t i=0;i<nparts;i++) tsegav+=TimeSegL10[i];
+      tsegav/=nparts;
+      double tleft=tsegav*(TimeMax-TimeStep);
+    #else
+      const double tleft=(tcalc/(TimeStep-TimeStepIni))*(TimeMax-TimeStep);
+    #endif
     const string xparttime=fun::PrintStr((TimeStep>=100? "%9.4f": (TimeStep>=10? "%9.5f": "%9.6f")),TimeStep);
     string xtseg=fun::PrintStr("%9.2f",tseg);
     if(xtseg.size()>9)xtseg=fun::PrintStr("%6.3e",tseg);

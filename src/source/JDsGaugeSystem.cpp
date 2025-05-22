@@ -73,6 +73,10 @@ void JGaugeSystem::Reset(){
   ScellDiv=0;
   MapPosMin=TDouble3(0);
   DomPosMin=DomPosMax=TDouble3(0);
+  #ifdef _WITHMR
+    VResCount=0;
+    VResId=0;
+  #endif
   ResetCfgDefault();
   //-Free data CPU.
   DataCpu=JGaugeItem::StrDataCpu();
@@ -147,6 +151,16 @@ void JGaugeSystem::ConfigCtes(const StCteSph& csp,double timemax,double timepart
   DomPosMax=domposmax;
   ConfiguredCtes=true;
 }
+
+#ifdef _WITHMR //<vs_vrres_ini>
+//==============================================================================
+/// Configures VRes.
+//==============================================================================
+void JGaugeSystem::ConfigVRes(unsigned vrescount,unsigned vresid){
+  VResCount=vrescount;
+  VResId=vresid;
+}
+#endif         //<vs_vrres_end>
 
 //==============================================================================
 /// Loads initial conditions of XML object.
@@ -255,6 +269,13 @@ void JGaugeSystem::ReadXml(const JXml* sxml,TiXmlElement* lis,const JSphMk* mkin
         const string name=sxml->GetAttributeStr(ele,"name");
         if(GetGaugeIdx(name)!=UINT_MAX)Run_ExceptioonFile(fun::PrintStr("The name \'%s\' already exists.",name.c_str()),sxml->ErrGetFileRow(ele));
         const JGaugeItem::StDefault cfg=ReadXmlCommon(sxml,ele);
+
+        //-Common parameter for all gauges.
+        //-Check if vresid is specified. 
+        const unsigned vresid=(unsigned)sxml->ReadElementUnsigned(ele,"vres","id",true,UINT_MAX);
+        if(vresid!=UINT_MAX && vresid>=VResCount)
+          Run_ExceptioonFile("The id of variable resolution zone is invalid.",sxml->ErrGetFileRow(ele));
+        if(vresid!=UINT_MAX && vresid!=VResId)continue;
         //-Loads points
         //std::vector<tdouble3> points;
         //LoadPoints(sxml,ele,points);
@@ -374,6 +395,10 @@ void JGaugeSystem::ReadXml(const JXml* sxml,TiXmlElement* lis,const JSphMk* mkin
             ,true,mesh,outdata,tfmt,buffersize,kclimit,kcdummy,masslimit);
         }  //<vs_meeshdat_end>
         else Run_ExceptioonFile(fun::PrintStr("Gauge type \'%s\' is invalid.",cmd.c_str()),sxml->ErrGetFileRow(ele));
+        if(!gau){
+          ele=ele->NextSiblingElement();
+          continue;
+        }
         gau->SetSaveVtkPart(cfg.savevtkpart);
         //gau->ConfigComputeTiming(cfg.computestart,cfg.computeend,cfg.computedt);
         gau->ConfigOutputTiming (cfg.output,cfg.outputstart,cfg.outputend,cfg.outputdt);
@@ -398,7 +423,17 @@ JGaugeVelocity* JGaugeSystem::AddGaugeVel(std::string name,double computestart
   TpParticles typeparts=TpPartUnknown;
   if(activelink){
     const unsigned cmk=mkinfo->GetMkBlockByMkBound(mkbound);
-    if(cmk>=mkinfo->Size())Run_Exceptioon(fun::PrintStr("Error loading boundary objects. Mkbound=%u is unknown.",mkbound));
+    if(cmk>=mkinfo->Size()){
+      #ifdef _WITHMR
+        if(VResCount==0)Run_Exceptioon(fun::PrintStr("Error loading boundary objects. Mkbound=%u is unknown.",mkbound));
+        else {
+          Log->PrintfWarning("Velocity Gauge \'%s\': Mkbound=%u not found in VRes zone %u. Ignored.",name.c_str(),mkbound,VResId);
+          return NULL;
+        }
+      #else
+        Run_Exceptioon(fun::PrintStr("Error loading boundary objects. Mkbound=%u is unknown.",mkbound));
+      #endif
+    }
     const JSphMkBlock* mkb=mkinfo->Mkblock(cmk);
     typeparts=mkb->Type;
     if(typeparts!=TpPartFloating && typeparts!=TpPartMoving && typeparts!=TpPartFixed)
@@ -415,6 +450,9 @@ JGaugeVelocity* JGaugeSystem::AddGaugeVel(std::string name,double computestart
   gau->Config(CSP,Scell,ScellDiv,MapPosMin,DomPosMin,DomPosMax);
   gau->ConfigDomMCel(fixed);
   gau->ConfigComputeTiming(computestart,computeend,computedt);
+  #ifdef _WITHMR
+    gau->ConfigVRes(VResCount,VResId);
+  #endif
   //-Uses common configuration.
   gau->SetSaveVtkPart(CfgDefault.savevtkpart);
   gau->ConfigOutputTiming(CfgDefault.output,CfgDefault.outputstart
@@ -437,7 +475,17 @@ JGaugePressure* JGaugeSystem::AddGaugePres(std::string name,double computestart
   TpParticles typeparts=TpPartUnknown;
   if(activelink){
     const unsigned cmk=mkinfo->GetMkBlockByMkBound(mkbound);
-    if(cmk>=mkinfo->Size())Run_Exceptioon(fun::PrintStr("Error loading boundary objects. Mkbound=%u is unknown.",mkbound));
+    if(cmk>=mkinfo->Size()){
+      #ifdef _WITHMR
+        if(VResCount==0)Run_Exceptioon(fun::PrintStr("Error loading boundary objects. Mkbound=%u is unknown.",mkbound));
+        else {
+          Log->PrintfWarning("Pressure Gauge \'%s\': Mkbound=%u not found in VRes zone %u. Ignored.",name.c_str(),mkbound,VResId);
+          return NULL;
+        }
+      #else
+        Run_Exceptioon(fun::PrintStr("Error loading boundary objects. Mkbound=%u is unknown.",mkbound));
+      #endif
+    }
     const JSphMkBlock* mkb=mkinfo->Mkblock(cmk);
     typeparts=mkb->Type;
     if(typeparts!=TpPartFloating && typeparts!=TpPartMoving && typeparts!=TpPartFixed)
@@ -454,6 +502,9 @@ JGaugePressure* JGaugeSystem::AddGaugePres(std::string name,double computestart
   gau->Config(CSP,Scell,ScellDiv,MapPosMin,DomPosMin,DomPosMax);
   gau->ConfigDomMCel(fixed);
   gau->ConfigComputeTiming(computestart,computeend,computedt);
+  #ifdef _WITHMR
+    gau->ConfigVRes(VResCount,VResId);
+  #endif
   //-Uses common configuration.
   gau->SetSaveVtkPart(CfgDefault.savevtkpart);
   gau->ConfigOutputTiming(CfgDefault.output,CfgDefault.outputstart
@@ -476,6 +527,9 @@ JGaugeSwl* JGaugeSystem::AddGaugeSwl(std::string name,double computestart
   gau->Config(CSP,Scell,ScellDiv,MapPosMin,DomPosMin,DomPosMax);
   gau->ConfigDomMCel(fixed);
   gau->ConfigComputeTiming(computestart,computeend,computedt);
+  #ifdef _WITHMR
+    gau->ConfigVRes(VResCount,VResId);
+  #endif
   //-Uses common configuration.
   gau->SetSaveVtkPart(CfgDefault.savevtkpart);
   gau->ConfigOutputTiming(CfgDefault.output,CfgDefault.outputstart
@@ -497,6 +551,9 @@ JGaugeMaxZ* JGaugeSystem::AddGaugeMaxZ(std::string name,double computestart
   gau->Config(CSP,Scell,ScellDiv,MapPosMin,DomPosMin,DomPosMax);
   gau->ConfigDomMCel(fixed);
   gau->ConfigComputeTiming(computestart,computeend,computedt);
+  #ifdef _WITHMR
+    gau->ConfigVRes(VResCount,VResId);
+  #endif
   //-Uses common configuration.
   gau->SetSaveVtkPart(CfgDefault.savevtkpart);
   gau->ConfigOutputTiming(CfgDefault.output,CfgDefault.outputstart
@@ -522,6 +579,9 @@ JGaugeMesh* JGaugeSystem::AddGaugeMesh(std::string name,double computestart
   gau->Config(CSP,Scell,ScellDiv,MapPosMin,DomPosMin,DomPosMax);
   gau->ConfigDomMCel(fixed);
   gau->ConfigComputeTiming(computestart,computeend,computedt);
+  #ifdef _WITHMR
+    gau->ConfigVRes(VResCount,VResId);
+  #endif
   //-Uses common configuration.
   gau->SetSaveVtkPart(CfgDefault.savevtkpart);
   gau->ConfigOutputTiming(CfgDefault.output,CfgDefault.outputstart
@@ -541,7 +601,17 @@ JGaugeForce* JGaugeSystem::AddGaugeForce(std::string name,double computestart
   if(GetGaugeIdx(name)!=UINT_MAX)Run_Exceptioon(fun::PrintStr("The name \'%s\' already exists.",name.c_str()));
   //-Obtains data from mkbound particles.
   const unsigned cmk=mkinfo->GetMkBlockByMkBound(mkbound);
-  if(cmk>=mkinfo->Size())Run_Exceptioon(fun::PrintStr("Error loading boundary objects. Mkbound=%u is unknown.",mkbound));
+  if(cmk>=mkinfo->Size()){
+    #ifdef _WITHMR
+      if(VResCount==0)Run_Exceptioon(fun::PrintStr("Error loading boundary objects. Mkbound=%u is unknown.",mkbound));
+      else {
+          Log->PrintfWarning("Force Gauge \'%s\': Mkbound=%u not found in VRes zone %u. Ignored.",name.c_str(),mkbound,VResId);
+        return NULL;
+      }
+    #else
+      Run_Exceptioon(fun::PrintStr("Error loading boundary objects. Mkbound=%u is unknown.",mkbound));
+    #endif
+  }
   const JSphMkBlock* mkb=mkinfo->Mkblock(cmk);
   const TpParticles typeparts=mkb->Type;
   if(typeparts!=TpPartFixed && typeparts!=TpPartMoving && typeparts!=TpPartFloating)
@@ -556,6 +626,9 @@ JGaugeForce* JGaugeSystem::AddGaugeForce(std::string name,double computestart
   gau->Config(CSP,Scell,ScellDiv,MapPosMin,DomPosMin,DomPosMax);
   gau->ConfigDomMCel(fixed);
   gau->ConfigComputeTiming(computestart,computeend,computedt);
+  #ifdef _WITHMR
+    gau->ConfigVRes(VResCount,VResId);
+  #endif
   //-Uses common configuration.
   gau->SetSaveVtkPart(CfgDefault.savevtkpart);
   gau->ConfigOutputTiming(CfgDefault.output,CfgDefault.outputstart
@@ -570,6 +643,11 @@ JGaugeForce* JGaugeSystem::AddGaugeForce(std::string name,double computestart
 void JGaugeSystem::VisuConfig(std::string txhead,std::string txfoot){
   SaveVtkInitPoints(); //-Includes gauges defined by coding.
   if(!txhead.empty())Log->Print(txhead);
+  #ifdef _WITHMR
+    if(VResCount>0){
+      Log->Printf("VRes Zone: %u",VResId);
+    }
+  #endif
   for(unsigned cg=0;cg<GetCount();cg++){
     const JGaugeItem* gau=Gauges[cg];
     Log->Printf("Guage_%u: \'%s\'",gau->Idx,gau->Name.c_str());

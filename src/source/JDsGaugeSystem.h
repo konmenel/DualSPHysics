@@ -97,6 +97,10 @@ private:
 public:
   const bool Cpu;
   const int GpuCount;   ///<Number of GPUs (units) in use.
+ #ifdef _WITHMR //<vs_vrres_ini>
+  unsigned VResCount;    ///<Number of variable resolution zones (default=0).
+  unsigned VResId;       ///<Id of variable resolution zone (default=0).
+ #endif         //<vs_vrres_end>
 
 public:
   JGaugeSystem(int gpucount);
@@ -109,6 +113,10 @@ public:
 
   void ConfigCtes(const StCteSph& csp,double timemax,double timepart
     ,float scell,int scelldiv,tdouble3 mapposmin,tdouble3 domposmin,tdouble3 domposmax);
+
+ #ifdef _WITHMR //<vs_vrres_ini>
+  void ConfigVRes(unsigned vrescount,unsigned vresid);
+ #endif         //<vs_vrres_end>
 
   void LoadXml(const JXml* sxml,const std::string& place,const JSphMk* mkinfo);
   void VisuConfig(std::string txhead,std::string txfoot);

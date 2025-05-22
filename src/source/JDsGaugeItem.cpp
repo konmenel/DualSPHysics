@@ -97,6 +97,10 @@ void JGaugeItem::Reset(){
   TimeStep=0;
   OutCount=0;
   OutFile="";
+  #ifdef _WITHMR
+    VResCount=0;
+    VResId=0;
+  #endif
 }
 
 //==============================================================================
@@ -133,6 +137,16 @@ void JGaugeItem::ConfigOutputTiming(bool save,double start,double end,double dt)
   OutputEnd=end;
   OutputNext=0;
 }
+
+#ifdef _WITHMR //<vs_vrres_ini>
+//==============================================================================
+/// Configures VRes.
+//==============================================================================
+void JGaugeItem::ConfigVRes(unsigned vrescount,unsigned vresid){
+  VResCount=vrescount;
+  VResId=vresid;
+}
+#endif         //<vs_vrres_end>
 
 //==============================================================================
 /// Returns type in string.
@@ -512,7 +526,12 @@ void JGaugeVelocity::SaveResults(){
   if(OutCount){
     const bool first=OutFile.empty();
     if(first){
-      OutFile=GetResultsFileCsv();
+      #ifdef _WITHMR
+        if(VResCount>0) OutFile=GetResultsFileCsv(fun::PrintStr("_vres%02u",VResId));
+        else OutFile=GetResultsFileCsv();
+      #else
+        OutFile=GetResultsFileCsv();
+      #endif
       Log->AddFileInfo(OutFile,FileInfo);
     }
     jcsv::JSaveCsv2 scsv(OutFile,!first,AppInfo.GetCsvSepComa());
@@ -540,8 +559,15 @@ void JGaugeVelocity::SaveVtkResult(unsigned cpart){
   arrays.AddArray("Pos",1,&(Result.point),false);
   arrays.AddArray("Vel",1,&(Result.vel),false);
   arrays.AddArray("sumwab",1,&(Result.sumwab), false);
-  Log->AddFileInfo(fun::FileNameSec(GetResultsFileVtk(),UINT_MAX),FileInfo);
-  JSpVtkData::Save(fun::FileNameSec(GetResultsFileVtk(),cpart),arrays,"Pos");
+  #ifdef _WITHMR
+    std::string basefilename;
+    if(VResCount>0)basefilename=GetResultsFileVtk(fun::PrintStr("_vres%02u", VResId));
+    else basefilename=GetResultsFileVtk();
+  #else
+    std::string basefilename=GetResultsFileVtk()
+  #endif
+  Log->AddFileInfo(fun::FileNameSec(basefilename,UINT_MAX),FileInfo);
+  JSpVtkData::Save(fun::FileNameSec(basefilename,cpart),arrays,"Pos");
 }
 
 //==============================================================================
@@ -777,7 +803,12 @@ void JGaugePressure::SaveResults(){
 if(OutCount){
   const bool first=OutFile.empty();
   if(first){
-    OutFile=GetResultsFileCsv();
+    #ifdef _WITHMR
+      if(VResCount>0) OutFile=GetResultsFileCsv(fun::PrintStr("_vres%02u",VResId));
+      else OutFile=GetResultsFileCsv();
+    #else
+      OutFile=GetResultsFileCsv();
+    #endif
     Log->AddFileInfo(OutFile,FileInfo);
   }
   jcsv::JSaveCsv2 scsv(OutFile,!first,AppInfo.GetCsvSepComa());
@@ -805,8 +836,15 @@ JDataArrays arrays;
 arrays.AddArray("Pos",1,&(Result.point),false);
 arrays.AddArray("Pres",1,&(Result.pres),false);
 arrays.AddArray("sumwab",1,&(Result.sumwab), false);
-Log->AddFileInfo(fun::FileNameSec(GetResultsFileVtk(),UINT_MAX),FileInfo);
-JSpVtkData::Save(fun::FileNameSec(GetResultsFileVtk(),cpart),arrays,"Pos");
+#ifdef _WITHMR
+  std::string basefilename;
+  if(VResCount>0)basefilename=GetResultsFileVtk(fun::PrintStr("_vres%02u", VResId));
+  else basefilename=GetResultsFileVtk();
+#else
+  std::string basefilename=GetResultsFileVtk()
+#endif
+Log->AddFileInfo(fun::FileNameSec(basefilename,UINT_MAX),FileInfo);
+JSpVtkData::Save(fun::FileNameSec(basefilename,cpart),arrays,"Pos");
 }
 
 //==============================================================================
@@ -1075,7 +1113,12 @@ void JGaugeSwl::SaveResults(){
   if(OutCount){
     const bool first=OutFile.empty();
     if(first){
-      OutFile=GetResultsFileCsv();
+      #ifdef _WITHMR
+        if(VResCount>0) OutFile=GetResultsFileCsv(fun::PrintStr("_vres%02u",VResId));
+        else OutFile=GetResultsFileCsv();
+      #else
+        OutFile=GetResultsFileCsv();
+      #endif
       Log->AddFileInfo(OutFile,FileInfo);
     }
     jcsv::JSaveCsv2 scsv(OutFile,!first,AppInfo.GetCsvSepComa());
@@ -1101,8 +1144,15 @@ void JGaugeSwl::SaveResults(){
 void JGaugeSwl::SaveVtkResult(unsigned cpart){
   JDataArrays arrays;
   arrays.AddArray("Pos",1,&(Result.posswl),false);
-  Log->AddFileInfo(fun::FileNameSec(GetResultsFileVtk(),UINT_MAX),FileInfo);
-  JSpVtkData::Save(fun::FileNameSec(GetResultsFileVtk(),cpart),arrays,"Pos");
+  #ifdef _WITHMR
+    std::string basefilename;
+    if(VResCount>0)basefilename=GetResultsFileVtk(fun::PrintStr("_vres%02u", VResId));
+    else basefilename=GetResultsFileVtk();
+  #else
+    std::string basefilename=GetResultsFileVtk()
+  #endif
+  Log->AddFileInfo(fun::FileNameSec(basefilename,UINT_MAX),FileInfo);
+  JSpVtkData::Save(fun::FileNameSec(basefilename,cpart),arrays,"Pos");
 }
 
 //==============================================================================
@@ -1362,7 +1412,12 @@ void JGaugeMaxZ::SaveResults(){
   if(OutCount){
     const bool first=OutFile.empty();
     if(first){
-      OutFile=GetResultsFileCsv();
+      #ifdef _WITHMR
+        if(VResCount>0) OutFile=GetResultsFileCsv(fun::PrintStr("_vres%02u",VResId));
+        else OutFile=GetResultsFileCsv();
+      #else
+        OutFile=GetResultsFileCsv();
+      #endif
       Log->AddFileInfo(OutFile,FileInfo);
     }
     jcsv::JSaveCsv2 scsv(OutFile,!first,AppInfo.GetCsvSepComa());
@@ -1393,8 +1448,15 @@ void JGaugeMaxZ::SaveVtkResult(unsigned cpart){
   JDataArrays arrays;
   arrays.AddArray("Pos",1,&ptz,false);
   arrays.AddArray("Height",1,&height,false);
-  Log->AddFileInfo(fun::FileNameSec(GetResultsFileVtk(),UINT_MAX),FileInfo);
-  JSpVtkData::Save(fun::FileNameSec(GetResultsFileVtk(),cpart),arrays,"Pos");
+  #ifdef _WITHMR
+    std::string basefilename;
+    if(VResCount>0)basefilename=GetResultsFileVtk(fun::PrintStr("_vres%02u", VResId));
+    else basefilename=GetResultsFileVtk();
+  #else
+    std::string basefilename=GetResultsFileVtk()
+  #endif
+  Log->AddFileInfo(fun::FileNameSec(basefilename,UINT_MAX),FileInfo);
+  JSpVtkData::Save(fun::FileNameSec(basefilename,cpart),arrays,"Pos");
 }
 
 //==============================================================================
@@ -1786,14 +1848,22 @@ void JGaugeMesh::SaveResults(){
     if(SaveCsv){
       bool first=OutFile.empty();
       if(first){
-        OutFile=GetResultsFileCsv("XXX");
+        #ifdef _WITHMR
+          OutFile=GetResultsFileCsv(fun::PrintStr("XXX_vres%02u",VResId));
+        #else
+          OutFile=GetResultsFileCsv("XXX");
+        #endif
         Log->AddFileInfo(OutFile,FileInfo);
       }
       const JDataArrays* arr=OutBuff[0].meshdat->GetArrays();
       const unsigned na=arr->Count();
       for(unsigned ca=0;ca<na;ca++){
         const JDataArrays::StDataArray& ar=arr->GetArrayCte(ca);
-        string file=GetResultsFileCsv(string("_")+ar.keyname);
+        #ifdef _WITHMR
+          string file=GetResultsFileCsv(fun::PrintStr("_vres%02u_",VResId)+ar.keyname);
+        #else
+          string file=GetResultsFileCsv(string("_")+ar.keyname);
+        #endif
         jcsv::JSaveCsv2 scsv(file,!first,AppInfo.GetCsvSepComa());
         for(unsigned c=0;c<OutCount;c++){
           jmsh::JMeshTDatasSave::SaveCsv(OutBuff[c].meshdat,ca,scsv,first && !c);
@@ -1802,7 +1872,11 @@ void JGaugeMesh::SaveResults(){
     }
     if(SaveBin){
       if(!MeshDataSave){
-        const string file=GetResultsFile(false,"mbi4");
+        #ifdef _WITHMR
+          const string file=GetResultsFile(false,"mbi4", fun::PrintStr("_vres%02u",VResId));
+        #else
+          const string file=GetResultsFile(false,"mbi4");
+        #endif
         Log->AddFileInfo(file,FileInfo);
         MeshDataSave=new jmsh::JMeshTDatasSave();
         MeshDataSave->Config(file,AppInfo.GetFullName(),OutBuff[0].meshdat);
@@ -1828,13 +1902,25 @@ void JGaugeMesh::SaveResults(){
 /// Saves last result in VTK file.
 //==============================================================================
 void JGaugeMesh::SaveVtkResult(unsigned cpart){
+  #ifdef _WITHMR
+    std::string basefilename;
+    if(VResCount>0)basefilename=GetResultsFileVtk(fun::PrintStr("_vres%02u", VResId));
+    else basefilename=GetResultsFileVtk();
+  #else
+    std::string basefilename=GetResultsFileVtk()
+  #endif
   //-Saves VTK with npt size data.
-  Log->AddFileInfo(fun::FileNameSec(GetResultsFileVtk(),UINT_MAX),FileInfo);
-  jmsh::JMeshTDatasSave::SaveVtk(GetResultsFileVtk(),int(cpart),MeshDat,false);
+  Log->AddFileInfo(fun::FileNameSec(basefilename,UINT_MAX),FileInfo);
+  jmsh::JMeshTDatasSave::SaveVtk(basefilename,int(cpart),MeshDat,false);
   //-Saves VTK with zsurf data.
   if(ComputeZsurf){
-    Log->AddFileInfo(fun::FileNameSec(GetResultsFileVtk("_Zsurf"),UINT_MAX),FileInfo);
-    jmsh::JMeshTDatasSave::SaveVtk(GetResultsFileVtk("_Zsurf"),int(cpart),MeshDat,true);
+    #ifdef _WITHMR
+      std::string basefilenamezsurf=GetResultsFileVtk(fun::PrintStr("_Zsurf_vres%02u", VResId));
+    #else
+      std::string basefilenamezsurf=GetResultsFileVtk("_Zsurf")
+    #endif
+    Log->AddFileInfo(fun::FileNameSec(basefilenamezsurf,UINT_MAX),FileInfo);
+    jmsh::JMeshTDatasSave::SaveVtk(basefilenamezsurf,int(cpart),MeshDat,true);
   }
 }
 
@@ -2200,7 +2286,12 @@ void JGaugeForce::SaveResults(){
   if(OutCount){
     const bool first=OutFile.empty();
     if(first){
-      OutFile=GetResultsFileCsv();
+      #ifdef _WITHMR
+        if(VResCount>0) OutFile=GetResultsFileCsv(fun::PrintStr("_vres%02u",VResId));
+        else OutFile=GetResultsFileCsv();
+      #else
+        OutFile=GetResultsFileCsv();
+      #endif
       Log->AddFileInfo(OutFile,FileInfo);
     }
     jcsv::JSaveCsv2 scsv(OutFile,!first,AppInfo.GetCsvSepComa());
@@ -2227,8 +2318,15 @@ void JGaugeForce::SaveVtkResult(unsigned cpart){
   JDataArrays arrays;
   arrays.AddArray("Pos",1,&InitialCenter,false);
   arrays.AddArray("Force",1,&(Result.force),false);
-  Log->AddFileInfo(fun::FileNameSec(GetResultsFileVtk(),UINT_MAX),FileInfo);
-  JSpVtkData::Save(fun::FileNameSec(GetResultsFileVtk(),cpart),arrays,"Pos");
+  #ifdef _WITHMR
+    std::string basefilename;
+    if(VResCount>0)basefilename=GetResultsFileVtk(fun::PrintStr("_vres%02u", VResId));
+    else basefilename=GetResultsFileVtk();
+  #else
+    std::string basefilename=GetResultsFileVtk()
+  #endif
+  Log->AddFileInfo(fun::FileNameSec(basefilename,UINT_MAX),FileInfo);
+  JSpVtkData::Save(fun::FileNameSec(basefilename,cpart),arrays,"Pos");
 }
 
 //==============================================================================

@@ -178,6 +178,11 @@ protected:
   const bool Cpu;
   const int GpuCount;  ///<Number of GPUs (units) in use.
   std::string FileInfo;
+ #ifdef _WITHMR //<vs_vrres_ini>
+  unsigned VResCount;    ///<Number of variable resolution zones (default=0).
+  unsigned VResId;       ///<Id of variable resolution zone (default=0).
+ #endif         //<vs_vrres_end>
+
 
   //-Constant values for calculation (they are constant).
   StCteSph CSP;        ///<Structure with main SPH constants values and configurations.
@@ -252,6 +257,9 @@ public:
   void SetSaveVtkPart(bool save){ SaveVtkPart=save; }
   void ConfigComputeTiming(double start,double end,double dt);
   void ConfigOutputTiming(bool save,double start,double end,double dt);
+ #ifdef _WITHMR //<vs_vrres_ini>
+  void ConfigVRes(unsigned vrescount,unsigned vresid);
+ #endif         //<vs_vrres_end>
 
   void GetConfig(std::vector<std::string>& lines)const;
 

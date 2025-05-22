@@ -313,6 +313,11 @@ void JSph::InitVars(){
   MaxNumbers.Clear();
 
   SaveFtAce=false;
+
+  #ifdef _WITHMR //<vs_vrres_ini>
+    VResCount=0;    ///<Number of variable resolution zones (default=0).
+    VResId=0;       ///<Id of variable resolution zone (default=0).
+  #endif         //<vs_vrres_end>
 }
 
 //==============================================================================
@@ -1404,7 +1409,13 @@ void JSph::ConfigBoundNormals(unsigned np,unsigned npb,const tdouble3* pos
   }
 
   //-Saves normals from boundary particles to boundary limit.
-  const string file1=DirOut+"CfgInit_Normals.vtk";
+  #ifdef _WITHMR
+    string file1;
+    if(VResCount>0) file1=DirOut+fun::PrintStr("CfgInit_vres%02u_Normals.vtk",VResId);
+    else file1=DirOut+"CfgInit_Normals.vtk";
+  #else
+    const string file1=DirOut+"CfgInit_Normals.vtk";
+  #endif
   Log->AddFileInfo(file1,"Saves VTK file with initial normals (from boundary particles to boundary limit).");
   SaveVtkNormals(file1,-1,np,npb,pos,idp,boundnor,(PartBegin? 0.5f: 1.f));
   //-Counts the null normals.
@@ -1417,7 +1428,13 @@ void JSph::ConfigBoundNormals(unsigned np,unsigned npb,const tdouble3* pos
     if(!PartBegin)boundnor[p]=(boundnor[p]*2.f);
   }
   //-Saves normals from boundary particles to ghost node.
-  const string file2=DirOut+"CfgInit_NormalsGhost.vtk";
+  #ifdef _WITHMR
+    string file2;
+    if(VResCount>0) file2=DirOut+fun::PrintStr("CfgInit_vres%02u_Normals.vtk",VResId);
+    else file2=DirOut+"CfgInit_Normals.vtk";
+  #else
+    const string file2=DirOut+"CfgInit_Normals.vtk";
+  #endif
   Log->AddFileInfo(file2,"Saves VTK file with initial normals (from boundary particles to ghost node).");
   SaveVtkNormals(file2,-1,np,npb,pos,idp,boundnor,1.f);
   if(nerr  >0)Log->PrintfWarning("There are %u of %u fixed or moving boundary particles without normal data.",nerr,npb);
@@ -2256,6 +2273,9 @@ void JSph::InitRun(unsigned np,const unsigned* idp,const tdouble3* pos){
   //-Configuration of GaugeSystem.
   GaugeSystem->ConfigCtes(CSP,TimeMax,TimePart,Scell,ScellDiv
     ,Map_PosMin,Map_PosMin,Map_PosMax);
+  #ifdef _WITHMR
+    GaugeSystem->ConfigVRes(VResCount, VResId);
+  #endif
   if(xml.GetNodeSimple("case.execution.special.gauges",true))
     GaugeSystem->LoadXml(&xml,"case.execution.special.gauges",MkInfo);
   GaugeSystem->ConfigureLinks(FtCount,FtObjs,DsMotion);

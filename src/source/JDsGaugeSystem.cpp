@@ -275,7 +275,10 @@ void JGaugeSystem::ReadXml(const JXml* sxml,TiXmlElement* lis,const JSphMk* mkin
         const unsigned vresid=(unsigned)sxml->ReadElementUnsigned(ele,"vres","id",true,UINT_MAX);
         if(vresid!=UINT_MAX && vresid>=VResCount)
           Run_ExceptioonFile("The id of variable resolution zone is invalid.",sxml->ErrGetFileRow(ele));
-        if(vresid!=UINT_MAX && vresid!=VResId)continue;
+        if(vresid!=UINT_MAX && vresid!=VResId){
+          ele=ele->NextSiblingElement();
+          continue;
+        }
         //-Loads points
         //std::vector<tdouble3> points;
         //LoadPoints(sxml,ele,points);

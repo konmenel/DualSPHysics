@@ -3390,7 +3390,13 @@ void JSph::SaveInitialDomainVtk()const{
     vdomf3[4]=ToTFloat3(Map_PosMin);
     vdomf3[5]=ToTFloat3(Map_PosMax);
   }
-  const string file=DirOut+"CfgInit_Domain.vtk";
+  #ifdef _WITHMR
+    string file;
+    if(VResCount>0) file=DirOut+fun::PrintStr("CfgInit_vres%02u_Domain.vtk",VResId);
+    else file=DirOut+"CfgInit_Domain.vtk";
+  #else
+    const string file=DirOut+"CfgInit_Domain.vtk";
+  #endif
   Log->AddFileInfo(file,"Saves the limits of the case and the simulation domain limits.");
   JSpVtkShape ss;
   ss.AddBoxes(nbox,vdomf3,0);
@@ -3441,7 +3447,13 @@ void JSph::SaveMapCellsVtk(float scell)const{
     p1=TDouble3(pmin.x,pmin.y,pmax.z);
     for(unsigned cy=0;cy<=cells.y;cy++)ss.AddLine(p0+TDouble3(0,scell*cy,0),p1+TDouble3(0,scell*cy,0),2);
   }
-  const string file=DirOut+"CfgInit_MapCells.vtk";
+  #ifdef _WITHMR
+    string file;
+    if(VResCount>0) file=DirOut+fun::PrintStr("CfgInit_vres%02u_MapCells.vtk",VResId);
+    else file=DirOut+"CfgInit_MapCells.vtk";
+  #else
+    const string file=DirOut+"CfgInit_MapCells.vtk";
+  #endif
   Log->AddFileInfo(file,"Saves the cell division of the simulation domain.");
   ss.SaveVtk(file,"Axis");
 }

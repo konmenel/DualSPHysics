@@ -28,7 +28,7 @@ else
     CCFLAGS+= -march=native
   endif
 endif
-CC=g++-13
+CC=$(NVCC_CCBIN)
 CCLINKFLAGS=-fopenmp -lgomp
 
 ifeq ($(COMPILE_VTKLIB), NO)

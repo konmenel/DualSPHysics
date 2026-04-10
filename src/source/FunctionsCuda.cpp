@@ -80,20 +80,37 @@ StGpuInfo GetCudaDeviceInfo(int gid){
   g.mp=deviceProp.multiProcessorCount;
   g.coresmp=_ConvertSMVer2Cores(deviceProp.major,deviceProp.minor);
   g.cores=g.coresmp*g.mp;
-  g.clockrate=deviceProp.clockRate;
-#if CUDART_VERSION >= 5000
-  g.clockratemem=deviceProp.memoryClockRate;
-  g.busmem=deviceProp.memoryBusWidth;
-  g.cachelv2=deviceProp.l2CacheSize;
+
+#if CUDART_VERSION >= 12000
+  int clockRate, memClockRate, timeoutEnabled, asyncCount;
+  cudaDeviceGetAttribute(&clockRate, cudaDevAttrClockRate, gid);
+  cudaDeviceGetAttribute(&memClockRate, cudaDevAttrMemoryClockRate, gid);
+  cudaDeviceGetAttribute(&timeoutEnabled, cudaDevAttrKernelExecTimeout, gid);
+  cudaDeviceGetAttribute(&asyncCount, cudaDevAttrAsyncEngineCount, gid);
+
+  g.clockrate = clockRate;
+  g.clockratemem = memClockRate;
+  g.overlap = (asyncCount > 0);
+  g.overlapcount = asyncCount;
+  g.limitrun = timeoutEnabled;
+#else
+  g.clockrate = deviceProp.clockRate;
+  g.clockratemem = deviceProp.memoryClockRate;
+  g.overlap = deviceProp.deviceOverlap;
+  g.overlapcount = deviceProp.asyncEngineCount;
+  g.limitrun = deviceProp.kernelExecTimeoutEnabled;
 #endif
+
+#if CUDART_VERSION >= 5000
+  g.busmem = deviceProp.memoryBusWidth;
+  g.cachelv2 = deviceProp.l2CacheSize;
+#endif
+
   g.constantmem=deviceProp.totalConstMem;
   g.sharedmem=deviceProp.sharedMemPerBlock;
   g.regsblock=deviceProp.regsPerBlock;
   g.maxthmp=deviceProp.maxThreadsPerMultiProcessor;
   g.maxthblock=deviceProp.maxThreadsPerBlock;
-  g.overlap=deviceProp.deviceOverlap;
-  g.overlapcount=deviceProp.asyncEngineCount;
-  g.limitrun=deviceProp.kernelExecTimeoutEnabled;
   g.integrated=deviceProp.integrated;
   g.maphostmem=deviceProp.canMapHostMemory;
   g.eccmode=deviceProp.ECCEnabled;

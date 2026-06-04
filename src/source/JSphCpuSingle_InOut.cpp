@@ -108,6 +108,7 @@ void JSphCpuSingle::InOutInit(double timestepini){
 
   //-Updates new particle values for Laminar+SPS, mDBC...
   if(SpsTauRho2_c)SpsTauRho2_c->MemsetOffset(Np,0,newnp);
+  if(Sps2Strain_c)Sps2Strain_c->MemsetOffset(Np,0,newnp);
   if(BoundNor_c)BoundNor_c->MemsetOffset(Np,0,newnp);
   if(FSType_c)FSType_c->MemsetOffset(Np,3,newnp); //<vs_advshift>
   #ifdef AVAILABLE_DIVCLEAN
@@ -224,6 +225,7 @@ void JSphCpuSingle::InOutComputeStep(double stepdt){
 
   //-Updates new particle values for Laminar+SPS, mDBC...
   if(SpsTauRho2_c)SpsTauRho2_c->MemsetOffset(Np,0,newnp);
+  if(Sps2Strain_c)Sps2Strain_c->MemsetOffset(Np,0,newnp);
   if(BoundNor_c)BoundNor_c->MemsetOffset(Np,0,newnp);
   if(FSType_c)FSType_c->MemsetOffset(Np,3,newnp); //<vs_advshift>
   #ifdef AVAILABLE_DIVCLEAN

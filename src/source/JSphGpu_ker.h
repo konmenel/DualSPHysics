@@ -358,10 +358,10 @@ unsigned PeriodicMakeList(unsigned n,unsigned pini,bool stable,unsigned nmax
   ,const double* posz,const typecode* code,unsigned* listp);
 void PeriodicDuplicateVerlet(unsigned n,unsigned pini,tuint3 domcells,tdouble3 perinc
   ,const unsigned* listp,unsigned* idp,typecode* code,unsigned* dcell
-  ,double2* posxy,double* posz,float4* velrho,tsymatrix3f* spstau,float4* velrhom1);
+  ,double2* posxy,double* posz,float4* velrho,tsymatrix3f* spstau,tsymatrix3f* sps2strain,float4* velrhom1);
 void PeriodicDuplicateSymplectic(unsigned n,unsigned pini
   ,tuint3 domcells,tdouble3 perinc,const unsigned* listp,unsigned* idp,typecode* code
-  ,unsigned* dcell,double2* posxy,double* posz,float4* velrho,tsymatrix3f* spstau
+  ,unsigned* dcell,double2* posxy,double* posz,float4* velrho,tsymatrix3f* spstau,tsymatrix3f* sps2strain
   ,double2* posxypre,double* poszpre,float4* velrhopre);
 void PeriodicDuplicateNormals(unsigned n,unsigned pini,const unsigned* listp
   ,float3* normals,float3* motionvel,float3* motionace);

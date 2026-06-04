@@ -204,6 +204,7 @@ void JSphCpuSingle_VRes::ComputeStepBuffer(double dt,std::vector<JMatrix4d> mat,
 
     if(newnp){      
       if(SpsTauRho2_c)  SpsTauRho2_c->MemsetOffset(Np,0,newnp);
+      if(Sps2Strain_c)  Sps2Strain_c->MemsetOffset(Np,0,newnp);
       if(BoundNor_c)    BoundNor_c->MemsetOffset(Np,0,newnp);
       if(FSType_c)      FSType_c->MemsetOffset(Np,0,newnp);
       if(ShiftVel_c)    ShiftVel_c->MemsetOffset(Np,0,newnp);

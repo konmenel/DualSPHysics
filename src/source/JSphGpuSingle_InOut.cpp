@@ -125,6 +125,7 @@ void JSphGpuSingle::InOutInit(double timestepini){
 
   //-Updates new particle values for Laminar+SPS, mDBC...
   if(SpsTauRho2_g)SpsTauRho2_g->CuMemsetOffset(Np,0,newnp);
+  if(Sps2Strain_g)Sps2Strain_g->CuMemsetOffset(Np,0,newnp);
   if(BoundNor_g)BoundNor_g->CuMemsetOffset(Np,0,newnp);
   if(FSType_g)FSType_g->CuMemsetOffset(Np,3,newnp); //<vs_advshift>
   #ifdef AVAILABLE_DIVCLEAN
@@ -248,6 +249,7 @@ void JSphGpuSingle::InOutComputeStep(double stepdt){
 
   //-Updates new particle values for Laminar+SPS, mDBC...
   if(SpsTauRho2_g)SpsTauRho2_g->CuMemsetOffset(Np,0,newnp);
+  if(Sps2Strain_g)Sps2Strain_g->CuMemsetOffset(Np,0,newnp);
   if(BoundNor_g)BoundNor_g->CuMemsetOffset(Np,0,newnp);
   if(FSType_g)FSType_g->CuMemsetOffset(Np,3,newnp); //<vs_advshift>
   #ifdef AVAILABLE_DIVCLEAN

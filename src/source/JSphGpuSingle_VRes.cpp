@@ -234,6 +234,7 @@ void JSphGpuSingle_VRes::ComputeStepBuffer(double dt,std::vector<JMatrix4d> mat,
       
       //-Updates basic arrays.
       if(SpsTauRho2_g)  SpsTauRho2_g->CuMemsetOffset(Np,0,newnp);
+      if(Sps2Strain_g)  Sps2Strain_g->CuMemsetOffset(Np,0,newnp);
       if(BoundNor_g)    BoundNor_g  ->CuMemsetOffset(Np,0,newnp);
       if(FSType_g)      FSType_g    ->CuMemsetOffset(Np,0,newnp);
       if(ShiftVel_g)    ShiftVel_g  ->CuMemsetOffset(Np,0,newnp);

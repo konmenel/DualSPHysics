@@ -235,6 +235,7 @@ protected:
 
   unsigned GetParticlesData(unsigned n,unsigned pini,bool onlynormal
     ,unsigned* idp,tdouble3* pos,tfloat3* vel,float* rho,typecode* code
+    ,tfloat3* spstaunormal,tfloat3* spstaushear,tfloat3* spsstrainnormal,tfloat3* spsstrainshear
     ,const byte* filter,unsigned& npfilterdel);
   void ConfigOmp(const JSphCfgRun* cfg);
 

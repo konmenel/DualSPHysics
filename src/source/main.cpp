@@ -215,10 +215,10 @@ int main(int argc, char** argv){
         sph.Run(appname,&cfg,log);
       }
       #elif defined(_WITHGPU)                                 //<vs_vrres_end>
-      else{
+      // else{
         JSphGpuSingle sph;
         sph.Run(appname,&cfg,log);
-      }
+      // }
       #endif
       }
     }

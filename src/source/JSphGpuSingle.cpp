@@ -335,14 +335,14 @@ void JSphGpuSingle::RunPeriodic(){
             if(TStep==STEP_Verlet){
               cusph::PeriodicDuplicateVerlet(count,Np,DomCells,perinc,listpg.cptr()
                 ,Idp_g->ptr(),Code_g->ptr(),Dcell_g->ptr(),Posxy_g->ptr(),Posz_g->ptr()
-                ,Velrho_g->ptr(),AG_PTR(SpsTauRho2_g),VelrhoM1_g->ptr());
+                ,Velrho_g->ptr(),AG_PTR(SpsTauRho2_g),AG_PTR(Sps2Strain_g),VelrhoM1_g->ptr());
             }
             if(TStep==STEP_Symplectic){
               if(PosxyPre_g->Active()!=PoszPre_g->Active() || PoszPre_g->Active()!=VelrhoPre_g->Active())
                 Run_Exceptioon("Symplectic data is invalid.");
               cusph::PeriodicDuplicateSymplectic(count,Np,DomCells,perinc,listpg.cptr()
                 ,Idp_g->ptr(),Code_g->ptr(),Dcell_g->ptr(),Posxy_g->ptr(),Posz_g->ptr()
-                ,Velrho_g->ptr(),AG_PTR(SpsTauRho2_g),PosxyPre_g->ptr(),PoszPre_g->ptr(),VelrhoPre_g->ptr());
+                ,Velrho_g->ptr(),AG_PTR(SpsTauRho2_g),AG_PTR(Sps2Strain_g),PosxyPre_g->ptr(),PoszPre_g->ptr(),VelrhoPre_g->ptr());
             }
             if(UseNormals){
               cusph::PeriodicDuplicateNormals(count,Np,listpg.cptr()
@@ -424,8 +424,11 @@ void JSphGpuSingle::RunCellDivide(bool updateperiodic){
   }
   if(TVisco==VISCO_LaminarSPS){
     agsymatrix3f spstaug("-",Arrays_Gpu,true);
+    agsymatrix3f sps2straing("-",Arrays_Gpu,true);
     CellDivSingle->SortDataArrays(SpsTauRho2_g->cptr(),spstaug.ptr());
+    CellDivSingle->SortDataArrays(Sps2Strain_g->cptr(),sps2straing.ptr());
     SpsTauRho2_g->SwapPtr(&spstaug);
+    Sps2Strain_g->SwapPtr(&sps2straing);
   }
   if(UseNormals){
     if(SlipMode<SLIP_NoSlip){
@@ -1105,6 +1108,12 @@ void JSphGpuSingle::SaveData(){
   //-Stores particle data. | Graba datos de particulas.
   JDataArrays arrays;
   AddBasicArrays(arrays,npsave,AuxPos_c->cptr(),Idp_c->cptr(),AuxVel_c->cptr(),AuxRho_c->cptr());
+  if(SvSpsTau){
+      arrays.AddArray("SpsTauRho(xx;yy;zz)",npsave,AuxSpsTauRho2Normal_c->cptr());
+      arrays.AddArray("SpsTauRho(xy;xz;yz)",npsave,AuxSpsTauRho2Shear_c->cptr());
+      arrays.AddArray("Sps2Strain(xx;yy;zz)",npsave,AuxSps2StrainNormal_c->cptr());
+      arrays.AddArray("Sps2Strain(xy;xz;yz)",npsave,AuxSps2StrainShear_c->cptr());
+  }
   JSph::SaveData(npsave,arrays,1,&vdom,infoplus);
   //-Save VTK file with current boundary normals (for debug).
   if(UseNormals && SvNormals)SaveVtkNormalsGpu(DirVtkOut+"Normals.vtk",Part

@@ -2266,7 +2266,7 @@ __device__ void KerPeriodicDuplicatePos(unsigned pnew,unsigned pcopy
 //------------------------------------------------------------------------------
 __global__ void KerPeriodicDuplicateVerlet(unsigned n,unsigned pini,uint3 cellmax
   ,double3 perinc,const unsigned* listp,unsigned* idp,typecode* code,unsigned* dcell
-  ,double2* posxy,double* posz,float4* velrho,tsymatrix3f* spstau,float4* velrhom1)
+  ,double2* posxy,double* posz,float4* velrho,tsymatrix3f* spstau,tsymatrix3f* sps2strain,float4* velrhom1)
 {
   const unsigned p=blockIdx.x*blockDim.x + threadIdx.x; //-Number of particle.
   if(p<n){
@@ -2283,7 +2283,8 @@ __global__ void KerPeriodicDuplicateVerlet(unsigned n,unsigned pini,uint3 cellma
     code    [pnew]=CODE_SetPeriodic(code[pcopy]);
     velrho  [pnew]=velrho[pcopy];
     velrhom1[pnew]=velrhom1[pcopy];
-    if(spstau)spstau[pnew]=spstau[pcopy];
+    if(spstau)    spstau    [pnew]=spstau[pcopy];
+    if(sps2strain)sps2strain[pnew]=sps2strain[pcopy];
   }
 }
 
@@ -2294,13 +2295,13 @@ __global__ void KerPeriodicDuplicateVerlet(unsigned n,unsigned pini,uint3 cellma
 void PeriodicDuplicateVerlet(unsigned n,unsigned pini,tuint3 domcells
   ,tdouble3 perinc,const unsigned* listp,unsigned* idp,typecode* code
   ,unsigned* dcell,double2* posxy,double* posz,float4* velrho
-  ,tsymatrix3f* spstau,float4* velrhom1)
+  ,tsymatrix3f* spstau,tsymatrix3f* sps2strain,float4* velrhom1)
 {
   if(n){
     uint3 cellmax=make_uint3(domcells.x-1,domcells.y-1,domcells.z-1);
     dim3 sgrid=GetSimpleGridSize(n,SPHBSIZE);
     KerPeriodicDuplicateVerlet <<<sgrid,SPHBSIZE>>> (n,pini,cellmax,Double3(perinc)
-      ,listp,idp,code,dcell,posxy,posz,velrho,spstau,velrhom1);
+      ,listp,idp,code,dcell,posxy,posz,velrho,spstau,sps2strain,velrhom1);
   }
 }
 
@@ -2316,7 +2317,7 @@ void PeriodicDuplicateVerlet(unsigned n,unsigned pini,tuint3 domcells
 template<bool varspre> __global__ void KerPeriodicDuplicateSymplectic(unsigned n
   ,unsigned pini,uint3 cellmax,double3 perinc,const unsigned* listp,unsigned* idp
   ,typecode* code,unsigned* dcell,double2* posxy,double* posz,float4* velrho
-  ,tsymatrix3f* spstau,double2* posxypre,double* poszpre,float4* velrhopre)
+  ,tsymatrix3f* spstau,tsymatrix3f* sps2strain,double2* posxypre,double* poszpre,float4* velrhopre)
 {
   const unsigned p=blockIdx.x*blockDim.x + threadIdx.x; //-Number of particle.
   if(p<n){
@@ -2336,7 +2337,8 @@ template<bool varspre> __global__ void KerPeriodicDuplicateSymplectic(unsigned n
       poszpre  [pnew]=poszpre[pcopy];
       velrhopre[pnew]=velrhopre[pcopy];
     }
-    if(spstau)spstau[pnew]=spstau[pcopy];
+    if(spstau)    spstau    [pnew]=spstau[pcopy];
+    if(sps2strain)sps2strain[pnew]=sps2strain[pcopy];
   }
 }
 
@@ -2347,16 +2349,16 @@ template<bool varspre> __global__ void KerPeriodicDuplicateSymplectic(unsigned n
 void PeriodicDuplicateSymplectic(unsigned n,unsigned pini
   ,tuint3 domcells,tdouble3 perinc,const unsigned* listp,unsigned* idp
   ,typecode* code,unsigned* dcell,double2* posxy,double* posz,float4* velrho
-  ,tsymatrix3f* spstau,double2* posxypre,double* poszpre,float4* velrhopre)
+  ,tsymatrix3f* spstau,tsymatrix3f* sps2strain,double2* posxypre,double* poszpre,float4* velrhopre)
 {
   if(n){
     uint3 cellmax=make_uint3(domcells.x-1,domcells.y-1,domcells.z-1);
     dim3 sgrid=GetSimpleGridSize(n,SPHBSIZE);
     if(posxypre!=NULL)KerPeriodicDuplicateSymplectic<true>  <<<sgrid,SPHBSIZE>>> 
-      (n,pini,cellmax,Double3(perinc),listp,idp,code,dcell,posxy,posz,velrho,spstau
+      (n,pini,cellmax,Double3(perinc),listp,idp,code,dcell,posxy,posz,velrho,spstau,sps2strain
         ,posxypre,poszpre,velrhopre);
     else              KerPeriodicDuplicateSymplectic<false> <<<sgrid,SPHBSIZE>>> 
-      (n,pini,cellmax,Double3(perinc),listp,idp,code,dcell,posxy,posz,velrho,spstau
+      (n,pini,cellmax,Double3(perinc),listp,idp,code,dcell,posxy,posz,velrho,spstau,sps2strain
         ,posxypre,poszpre,velrhopre);
   }
 }

@@ -289,7 +289,7 @@ void JSphCpuSingle::PeriodicDuplicatePos(unsigned pnew,unsigned pcopy,bool inver
 void JSphCpuSingle::PeriodicDuplicateVerlet(unsigned np,unsigned pini
   ,tuint3 cellmax,tdouble3 perinc,const unsigned* listp,unsigned* idp
   ,typecode* code,unsigned* dcell,tdouble3* pos,tfloat4* velrho
-  ,tsymatrix3f* spstau,tfloat4* velrhom1)const
+  ,tsymatrix3f* spstau,tsymatrix3f* sps2strain,tfloat4* velrhom1)const
 {
   const int n=int(np);
   #ifdef OMP_USE
@@ -306,7 +306,8 @@ void JSphCpuSingle::PeriodicDuplicateVerlet(unsigned np,unsigned pini
     code    [pnew]=CODE_SetPeriodic(code[pcopy]);
     velrho  [pnew]=velrho[pcopy];
     velrhom1[pnew]=velrhom1[pcopy];
-    if(spstau)spstau[pnew]=spstau[pcopy];
+    if(spstau)    spstau    [pnew]=spstau[pcopy];
+    if(sps2strain)sps2strain[pnew]=sps2strain[pcopy];
   }
 }
 
@@ -322,7 +323,7 @@ void JSphCpuSingle::PeriodicDuplicateVerlet(unsigned np,unsigned pini
 void JSphCpuSingle::PeriodicDuplicateSymplectic(unsigned np,unsigned pini
   ,tuint3 cellmax,tdouble3 perinc,const unsigned* listp,unsigned* idp
   ,typecode* code,unsigned* dcell,tdouble3* pos,tfloat4* velrho
-  ,tsymatrix3f* spstau,tdouble3* pospre,tfloat4* velrhopre)const
+  ,tsymatrix3f* spstau,tsymatrix3f* sps2strain,tdouble3* pospre,tfloat4* velrhopre)const
 {
   const int n=int(np);
   #ifdef OMP_USE
@@ -338,9 +339,10 @@ void JSphCpuSingle::PeriodicDuplicateSymplectic(unsigned np,unsigned pini
     idp   [pnew]=idp[pcopy];
     code  [pnew]=CODE_SetPeriodic(code[pcopy]);
     velrho[pnew]=velrho[pcopy];
-    if(pospre)   pospre   [pnew]=pospre[pcopy];
-    if(velrhopre)velrhopre[pnew]=velrhopre[pcopy];
-    if(spstau)   spstau   [pnew]=spstau[pcopy];
+    if(pospre)   pospre     [pnew]=pospre[pcopy];
+    if(velrhopre) velrhopre [pnew]=velrhopre[pcopy];
+    if(spstau)    spstau    [pnew]=spstau[pcopy];
+    if(sps2strain)sps2strain[pnew]=sps2strain[pcopy];
   }
 }
 
@@ -474,14 +476,14 @@ void JSphCpuSingle::RunPeriodic(){
             if(TStep==STEP_Verlet){
               PeriodicDuplicateVerlet(count,Np,DomCells,perinc,listp.cptr()
                 ,Idp_c->ptr(),Code_c->ptr(),Dcell_c->ptr(),Pos_c->ptr(),Velrho_c->ptr()
-                ,AC_PTR(SpsTauRho2_c),VelrhoM1_c->ptr());
+                ,AC_PTR(SpsTauRho2_c),AC_PTR(Sps2Strain_c),VelrhoM1_c->ptr());
             }
             if(TStep==STEP_Symplectic){
               if(PosPre_c->Active()!=VelrhoPre_c->Active())
                 Run_Exceptioon("Symplectic data is invalid.");
               PeriodicDuplicateSymplectic(count,Np,DomCells,perinc,listp.cptr()
                 ,Idp_c->ptr(),Code_c->ptr(),Dcell_c->ptr(),Pos_c->ptr(),Velrho_c->ptr()
-                ,AC_PTR(SpsTauRho2_c),PosPre_c->ptr(),VelrhoPre_c->ptr());
+                ,AC_PTR(SpsTauRho2_c),AC_PTR(Sps2Strain_c),PosPre_c->ptr(),VelrhoPre_c->ptr());
             }
             if(UseNormals){
               PeriodicDuplicateNormals(count,Np,DomCells,perinc,listp.cptr()
@@ -537,6 +539,7 @@ void JSphCpuSingle::RunCellDivide(bool updateperiodic){
   }
   if(TVisco==VISCO_LaminarSPS){
     CellDivSingle->SortArray(SpsTauRho2_c->ptr());
+    CellDivSingle->SortArray(Sps2Strain_c->ptr());
   }
   if(UseNormals){
     CellDivSingle->SortArray(BoundNor_c->ptr());
@@ -600,7 +603,7 @@ void JSphCpuSingle::AbortBoundOut(){
   actypecode cod("cod",Arrays_Cpu,true);
   unsigned nfilter=0;
   GetParticlesData(nboundout,Np,false,idp.ptr(),pos.ptr()
-    ,vel.ptr(),rho.ptr(),cod.ptr(),NULL,nfilter);
+    ,vel.ptr(),rho.ptr(),cod.ptr(),NULL,NULL,NULL,NULL,NULL,nfilter);
   //-Shows excluded particles information and aborts execution.
   JSph::AbortBoundOut(Log,nboundout,idp.cptr(),pos.cptr(),vel.cptr()
     ,rho.cptr(),cod.cptr());
@@ -620,7 +623,7 @@ void JSphCpuSingle::SaveFluidOut(){
   actypecode cod("cod",Arrays_Cpu,true);
   unsigned nfilter=0;
   GetParticlesData(npfout,Np,false,idp.ptr(),pos.ptr()
-    ,vel.ptr(),rho.ptr(),cod.ptr(),NULL,nfilter);
+    ,vel.ptr(),rho.ptr(),cod.ptr(),NULL,NULL,NULL,NULL,NULL,nfilter);
   //-Stores new excluded particles until recordering next PART.
   AddParticlesOut(npfout,idp.cptr(),pos.cptr(),vel.cptr()
     ,rho.cptr(),cod.cptr());
@@ -1249,6 +1252,10 @@ void JSphCpuSingle::SaveData(){
   acdouble3 svpos("svpos",Arrays_Cpu,save);
   acfloat3  svvel("svvel",Arrays_Cpu,save);
   acfloat   svrho("svrho",Arrays_Cpu,save);
+  acfloat3  svspstaurhonormal("svspstaurhonormal",Arrays_Cpu,save && SvSpsTau);
+  acfloat3  svspstaurhoshear("svspstaurhoshear",Arrays_Cpu,save && SvSpsTau);
+  acfloat3  svsps2strainnormal("svsps2strainnormal",Arrays_Cpu,save && SvSpsTau);
+  acfloat3  svsps2strainshear("svsps2strainshear",Arrays_Cpu,save && SvSpsTau);
   if(save){
     //-Prepare filter for output particles data. //<vs_outpaarts>
     acbyte filter("filter",Arrays_Cpu,false);
@@ -1264,6 +1271,7 @@ void JSphCpuSingle::SaveData(){
     unsigned npfilterdel=0;
     const unsigned npsel=GetParticlesData(Np,0,PeriActive!=0
       ,svidp.ptr(),svpos.ptr(),svvel.ptr(),svrho.ptr(),NULL
+      ,svspstaurhonormal.ptr(),svspstaurhoshear.ptr(),svsps2strainnormal.ptr(),svsps2strainshear.ptr()
       ,filter.cptr(),npfilterdel);
     if(npsel+npfilterdel!=npnormal)Run_Exceptioon("The number of particles is invalid.");
     npsave=npsel;
@@ -1294,6 +1302,12 @@ void JSphCpuSingle::SaveData(){
   //-Stores particle data. | Graba datos de particulas.
   JDataArrays arrays;
   AddBasicArrays(arrays,npsave,svpos.cptr(),svidp.cptr(),svvel.cptr(),svrho.cptr());
+  if(SvSpsTau){
+      arrays.AddArray("SpsTauRho(xx;yy;zz)",npsave,svsps2strainnormal.cptr());
+      arrays.AddArray("SpsTauRho(xy;xz;yz)",npsave,svsps2strainshear.cptr());
+      arrays.AddArray("Sps2Strain(xx;yy;zz)",npsave,svsps2strainnormal.cptr());
+      arrays.AddArray("Sps2Strain(xy;xz;yz)",npsave,svsps2strainshear.cptr());
+  }
   JSph::SaveData(npsave,arrays,1,&vdom,infoplus);
   //-Save VTK file with current boundary normals (for debug).
   if(UseNormals && SvNormals)SaveVtkNormals(DirVtkOut+"Normals.vtk",Part

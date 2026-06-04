@@ -148,6 +148,14 @@ void JSphGpu::InitVars(){
   AuxPos_c=NULL;
   AuxVel_c=NULL;
   AuxRho_c=NULL;
+
+  SpsTauRho2_c=NULL;
+  Sps2Strain_c=NULL;
+
+  AuxSpsTauRho2Normal_c=NULL;
+  AuxSpsTauRho2Shear_c=NULL;
+  AuxSps2StrainNormal_c=NULL;
+  AuxSps2StrainShear_c=NULL;
   FreeCpuMemoryParticles();
 
   Idp_g=NULL;
@@ -330,7 +338,15 @@ void JSphGpu::FreeCpuMemoryParticles(){
   delete AuxPos_c;   AuxPos_c=NULL;
   delete AuxVel_c;   AuxVel_c=NULL;
   delete AuxRho_c;   AuxRho_c=NULL;
-  
+
+  delete SpsTauRho2_c;            SpsTauRho2_c=NULL;
+  delete Sps2Strain_c;            Sps2Strain_c=NULL;
+
+  delete AuxSpsTauRho2Normal_c;   AuxSpsTauRho2Normal_c=NULL;
+  delete AuxSpsTauRho2Shear_c;    AuxSpsTauRho2Shear_c=NULL;
+  delete AuxSps2StrainNormal_c;   AuxSps2StrainNormal_c=NULL;
+  delete AuxSps2StrainShear_c;    AuxSps2StrainShear_c=NULL;
+
   //-Free CPU memory for array objects.
   CpuParticlesSize=0;
   if(Arrays_Cpu)Arrays_Cpu->Reset();
@@ -358,6 +374,15 @@ void JSphGpu::AllocCpuMemoryParticles(unsigned np){
   AuxPos_c=new acdouble3 ("AuxPosc",Arrays_Cpu,true);
   AuxVel_c=new acfloat3  ("AuxVelc",Arrays_Cpu,true);
   AuxRho_c=new acfloat   ("AuxRhoc",Arrays_Cpu,true);
+
+  if(SvSpsTau){
+    SpsTauRho2_c=new acsymatrix3f("SpsTauRho2c",Arrays_Cpu,true);
+    Sps2Strain_c=new acsymatrix3f("Sps2Strainc",Arrays_Cpu,true);
+    AuxSpsTauRho2Normal_c=new acfloat3("AuxSpsTauRho2Normal_c", Arrays_Cpu,true);
+    AuxSpsTauRho2Shear_c =new acfloat3("AuxSpsTauRho2Shear_c", Arrays_Cpu,true);
+    AuxSps2StrainNormal_c=new acfloat3("AuxSps2StrainNormal_c", Arrays_Cpu,true);
+    AuxSps2StrainShear_c =new acfloat3("AuxSps2StrainShear_c", Arrays_Cpu,true);
+  }
 }
 
 //==============================================================================
@@ -466,7 +491,7 @@ void JSphGpu::AllocGpuMemoryParticles(unsigned np){
   //-Arrays for Laminar+SPS.
   if(TVisco==VISCO_LaminarSPS){
     SpsTauRho2_g=new agsymatrix3f("SpsTauRho2g",Arrays_Gpu,true);
-    Sps2Strain_g=new agsymatrix3f("Sps2Straing",Arrays_Gpu,false); //-NO INITIAL MEMORY.
+    Sps2Strain_g=new agsymatrix3f("Sps2Straing",Arrays_Gpu,true);
   }
   //-Arrays for Shifting.
   ShiftPosfs_g=new agfloat4("ShiftPosfsg",Arrays_Gpu,false); //-NO INITIAL MEMORY.
@@ -639,12 +664,32 @@ unsigned JSphGpu::ParticlesDataDown(unsigned n,unsigned pini,bool code
   if(code || onlynormal){
     Code_g->CuCopyToHostOffset(pini,Code_c,0,n);
   }
+  if(SvSpsTau){
+    SpsTauRho2_g->CuCopyToHostOffset(pini,SpsTauRho2_c,0,n);
+    Sps2Strain_g->CuCopyToHostOffset(pini,Sps2Strain_c,0,n);
+  }
   //-Creates simple CPU pointers.
   unsigned* idpc   =Idp_c->ptr(); 
   tdouble2* posxyc =Posxy_c->ptr(); 
   double*   poszc  =Posz_c->ptr(); 
   tfloat4*  velrhoc=Velrho_c->ptr(); 
   typecode* codec  =Code_c->ptr();
+  
+  tsymatrix3f* spstaurho2c      =NULL;
+  tsymatrix3f* sps2strainc      =NULL;
+  tfloat3*     spstaurho2normalc=NULL;
+  tfloat3*     spstaurho2shearc =NULL;
+  tfloat3*     sps2strainnormalc=NULL;
+  tfloat3*     sps2strainshearc =NULL;
+  
+  if(SvSpsTau){
+    spstaurho2c=SpsTauRho2_c->ptr();
+    sps2strainc=Sps2Strain_c->ptr();
+    spstaurho2normalc=AuxSpsTauRho2Normal_c->ptr();
+    spstaurho2shearc =AuxSpsTauRho2Shear_c->ptr();
+    sps2strainnormalc=AuxSps2StrainNormal_c->ptr();
+    sps2strainshearc =AuxSps2StrainShear_c->ptr();
+  }
 
   //-Obtain filter data on CPU memory. //<vs_outpaarts_ini>
   byte* filter=NULL; 
@@ -669,6 +714,10 @@ unsigned JSphGpu::ParticlesDataDown(unsigned n,unsigned pini,bool code
         poszc  [p2]=poszc  [p];
         velrhoc[p2]=velrhoc[p];
         codec  [p2]=codec  [p];
+        if(SvSpsTau){
+          spstaurho2c[p2]=spstaurho2c[p];
+          sps2strainc[p2]=sps2strainc[p];
+        }
       }
       if(!selected){
         ndel++;
@@ -682,6 +731,15 @@ unsigned JSphGpu::ParticlesDataDown(unsigned n,unsigned pini,bool code
   //-Converts data to a simple format in AuxPos_c ,AuxVel_c and AuxRhop_c.
   Pos21Vel4ToPos3Vel31(num,posxyc,poszc,velrhoc
     ,AuxPos_c->ptr(),AuxVel_c->ptr(),AuxRho_c->ptr());
+
+  if(SvSpsTau){
+    for(unsigned p=0;p<num;p++){
+      spstaurho2normalc[p]=TFloat3(spstaurho2c[p].xx,spstaurho2c[p].yy,spstaurho2c[p].zz);
+      spstaurho2shearc[p] =TFloat3(spstaurho2c[p].xy,spstaurho2c[p].xz,spstaurho2c[p].yz);
+      sps2strainnormalc[p]=TFloat3(sps2strainc[p].xx,sps2strainc[p].yy,sps2strainc[p].zz);
+      sps2strainshearc[p] =TFloat3(sps2strainc[p].xy,sps2strainc[p].xz,sps2strainc[p].yz);
+    }
+  }
   return(num);
 }
 
@@ -831,6 +889,7 @@ void JSphGpu::InitRunGpu(){
   if(CaseNfloat)InitFloatingsGpu(FtoMasspg,FtoDatpg,FtoCenterg,DemDatag);
   if(TStep==STEP_Verlet)VelrhoM1_g->CuCopyFrom(Velrho_g,Np);
   if(TVisco==VISCO_LaminarSPS)SpsTauRho2_g->CuMemset(0,Np);
+  if(TVisco==VISCO_LaminarSPS)Sps2Strain_g->CuMemset(0,Np);
   if(MotionVel_g)MotionVel_g->CuMemset(0,Np); //<vs_m2dbc>
   if(MotionAce_g)MotionAce_g->CuMemset(0,Np); //<vs_m2dbc>
   if(ShiftVel_g)ShiftVel_g->CuMemset(0,Np);   //<vs_advshift>
@@ -922,7 +981,7 @@ void JSphGpu::PosInteraction_Forces(){
   Ace_g->Free();
   Delta_g->Free();
   ShiftPosfs_g->Free();
-  if(Sps2Strain_g)Sps2Strain_g->Free();
+  // if(Sps2Strain_g)Sps2Strain_g->Free();
   if(BoundMode_g)BoundMode_g->Free(); //-Reserved in MdbcBoundCorrection(). //<vs_m2dbc>
   if(TangenVel_g)TangenVel_g->Free(); //-Reserved in MdbcBoundCorrection(). //<vs_m2dbc>
   if(NoPenShift_g)NoPenShift_g->Free(); //<vs_m2dbcNP>

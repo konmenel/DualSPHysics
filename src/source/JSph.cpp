@@ -227,6 +227,7 @@ void JSph::InitVars(){
   SvRes=false;
   SvTimers=false;
   SvDomainVtk=false;
+  SvSpsTau=false;
 
   KernelH=CteB=Gamma=RhopZero=0;
   CFLnumber=0;
@@ -697,6 +698,7 @@ void JSph::LoadConfigParameters(const JXml* cxml){
   Visco=eparms.GetValueFloat("Visco");
   ViscoBoundFactor=eparms.GetValueFloat("ViscoBoundFactor",true,1.f);
   string filevisco=eparms.GetValueStr("ViscoTime",true);
+  if(TVisco==VISCO_LaminarSPS)SvSpsTau=eparms.GetValueBool("SaveSpsTau", false);
   if(!filevisco.empty()){
     ViscoTime=new JDsViscoInput();
     ViscoTime->LoadFile(DirCase+filevisco);
@@ -1703,6 +1705,7 @@ void JSph::VisuConfig(){
   if(TVisco==VISCO_LaminarSPS){     
     Log->Print(fun::VarStr("SpsSmag",SpsSmag));
     Log->Print(fun::VarStr("SpsBlin",SpsBlin));
+    if(SvSpsTau)Log->Print("SPS stress tensor output enabled (SpsTauRho2 + Sps2Strain).");
   }
   if(UseDEM)VisuDemCoefficients();
   if(CaseNfloat)Log->Print(fun::VarStr("FtPause",FtPause));

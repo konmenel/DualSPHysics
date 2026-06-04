@@ -281,7 +281,7 @@ void JSphCpu::AllocCpuMemoryParticles(unsigned np){
   //-Arrays for Laminar+SPS.
   if(TVisco==VISCO_LaminarSPS){
     SpsTauRho2_c=new acsymatrix3f("SpsTauRho2c",Arrays_Cpu,true);
-    Sps2Strain_c=new acsymatrix3f("Sps2Strainc",Arrays_Cpu,false); //-NO INITIAL MEMORY.
+    Sps2Strain_c=new acsymatrix3f("Sps2Strainc",Arrays_Cpu,true);
   }
   //-Arrays for Shifting.
   ShiftPosfs_c=new acfloat4("ShiftPosfsc",Arrays_Cpu,false); //-NO INITIAL MEMORY.
@@ -365,6 +365,7 @@ void JSphCpu::PrintAllocMemory(llong mcpu)const{
 //==============================================================================
 unsigned JSphCpu::GetParticlesData(unsigned n,unsigned pini,bool onlynormal
   ,unsigned* idp,tdouble3* pos,tfloat3* vel,float* rho,typecode* code
+  ,tfloat3* spstaunormal,tfloat3* spstaushear,tfloat3* spsstrainnormal,tfloat3* spsstrainshear
   ,const byte* filter,unsigned& npfilterdel)
 {
   unsigned num=n;
@@ -386,6 +387,18 @@ unsigned JSphCpu::GetParticlesData(unsigned n,unsigned pini,bool onlynormal
       vel[p]=TFloat3(vr.x,vr.y,vr.z); 
     }
     if(rho)for(unsigned p=0;p<n;p++)rho[p]=velrhoc[p+pini].w;
+  }
+  if(SvSpsTau){
+    const tsymatrix3f* spstaurho2c=SpsTauRho2_c->cptr();
+    const tsymatrix3f* sps2strainc=Sps2Strain_c->cptr();
+    for(unsigned p=0;p<n;p++){
+      const tsymatrix3f tau=spstaurho2c[p+pini];
+      const tsymatrix3f strain=sps2strainc[p+pini];
+      spstaunormal   [p]=TFloat3(tau.xx,tau.yy,tau.zz);
+      spstaushear    [p]=TFloat3(tau.xy,tau.xz,tau.yz);
+      spsstrainnormal[p]=TFloat3(strain.xx,strain.yy,strain.zz);
+      spsstrainshear [p]=TFloat3(strain.xy,strain.xz,strain.yz);
+    }
   }
 
   //-Eliminate non-normal particles (periodic&  others).
@@ -411,6 +424,12 @@ unsigned JSphCpu::GetParticlesData(unsigned n,unsigned pini,bool onlynormal
         vel  [p2]=vel[p];
         rho  [p2]=rho[p];
         code2[p2]=code2[p];
+        if(SvSpsTau){
+          spstaunormal   [p2]=spstaunormal   [p];
+          spstaushear    [p2]=spstaushear    [p];
+          spsstrainnormal[p2]=spsstrainnormal[p];
+          spsstrainshear [p2]=spsstrainshear [p];
+        }
       }
       if(!selected){
         ndel++;
@@ -473,6 +492,7 @@ void JSphCpu::InitRunCpu(){
   InitRun(Np,Idp_c->cptr(),Pos_c->cptr());
   if(TStep==STEP_Verlet)VelrhoM1_c->CopyFrom(Velrho_c,Np);
   if(TVisco==VISCO_LaminarSPS)SpsTauRho2_c->Memset(0,Np);
+  if(TVisco==VISCO_LaminarSPS)Sps2Strain_c->Memset(0,Np);
   if(MotionVel_c)MotionVel_c->Memset(0,Np); //<vs_m2dbc>
   if(MotionAce_c)MotionAce_c->Memset(0,Np); //<vs_m2dbc>
   if(ShiftVel_c)ShiftVel_c->Memset(0,Np);   //<vs_advshift>
@@ -614,7 +634,7 @@ void JSphCpu::PosInteraction_Forces(){
   Press_c->Free();
   Delta_c->Free();
   ShiftPosfs_c->Free();
-  if(Sps2Strain_c)Sps2Strain_c->Free();
+  // if(Sps2Strain_c)Sps2Strain_c->Free();
   if(BoundMode_c)BoundMode_c->Free(); //-Reserved in MdbcBoundCorrection(). //<vs_m2dbc>
   if(TangenVel_c)TangenVel_c->Free(); //-Reserved in MdbcBoundCorrection(). //<vs_m2dbc>
   if(NoPenShift_c)NoPenShift_c->Free(); //<vs_m2dbcNP>

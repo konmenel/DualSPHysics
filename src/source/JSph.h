@@ -225,6 +225,7 @@ protected:
   bool SvTimers;             ///<Computes the time for each process.                             | Obtiene tiempo para cada proceso.
   bool SvDomainVtk;          ///<Stores VTK file with the domain of particles of each PART file. | Graba fichero vtk con el dominio de las particulas en cada Part. 
   //bool SvInterCount;       ///<Computes and saves number of interactions.                      | Calcula y graba el numero de interacciones.
+  bool SvSpsTau;             ///<Save SPS tensors to output if SPS viscosity is active.
 
   //-Constants for computation (from input configuration).
   float KernelH;           ///<The smoothing length of SPH kernel [m].

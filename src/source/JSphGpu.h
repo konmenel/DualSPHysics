@@ -207,6 +207,14 @@ protected:
   //-Variables for Laminar+SPS viscosity (Opt) & (Opt,Null).  
   agsymatrix3f* SpsTauRho2_g; ///<SPS sub-particle stress tensor divided by rho^2 (tau/rho^2) (Opt).
   agsymatrix3f* Sps2Strain_g; ///<Two times strain tensor for SPS (2S^ij) (Opt,Null).
+  acsymatrix3f* SpsTauRho2_c; ///<SPS sub-particle stress tensor divided by rho^2 (tau/rho^2) (Opt) [CPU].
+  acsymatrix3f* Sps2Strain_c; ///<Two times strain tensor for SPS (2S^ij) (Opt,Null) [CPU].
+
+  //-Auxiliary variables for the conversion [CpuParticlesSize].
+  acfloat3*   AuxSpsTauRho2Normal_c;
+  acfloat3*   AuxSpsTauRho2Shear_c;
+  acfloat3*   AuxSps2StrainNormal_c;
+  acfloat3*   AuxSps2StrainShear_c;
 
   JDsTimersGpu* Timersg;  ///<Manages timers for GPU execution.
 

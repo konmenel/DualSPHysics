@@ -564,7 +564,7 @@ void JGaugeVelocity::SaveVtkResult(unsigned cpart){
     if(VResCount>0)basefilename=GetResultsFileVtk(fun::PrintStr("_vres%02u", VResId));
     else basefilename=GetResultsFileVtk();
   #else
-    std::string basefilename=GetResultsFileVtk()
+    std::string basefilename=GetResultsFileVtk();
   #endif
   Log->AddFileInfo(fun::FileNameSec(basefilename,UINT_MAX),FileInfo);
   JSpVtkData::Save(fun::FileNameSec(basefilename,cpart),arrays,"Pos");
@@ -841,7 +841,7 @@ arrays.AddArray("sumwab",1,&(Result.sumwab), false);
   if(VResCount>0)basefilename=GetResultsFileVtk(fun::PrintStr("_vres%02u", VResId));
   else basefilename=GetResultsFileVtk();
 #else
-  std::string basefilename=GetResultsFileVtk()
+  std::string basefilename=GetResultsFileVtk();
 #endif
 Log->AddFileInfo(fun::FileNameSec(basefilename,UINT_MAX),FileInfo);
 JSpVtkData::Save(fun::FileNameSec(basefilename,cpart),arrays,"Pos");
@@ -1149,7 +1149,7 @@ void JGaugeSwl::SaveVtkResult(unsigned cpart){
     if(VResCount>0)basefilename=GetResultsFileVtk(fun::PrintStr("_vres%02u", VResId));
     else basefilename=GetResultsFileVtk();
   #else
-    std::string basefilename=GetResultsFileVtk()
+    std::string basefilename=GetResultsFileVtk();
   #endif
   Log->AddFileInfo(fun::FileNameSec(basefilename,UINT_MAX),FileInfo);
   JSpVtkData::Save(fun::FileNameSec(basefilename,cpart),arrays,"Pos");
@@ -1453,7 +1453,7 @@ void JGaugeMaxZ::SaveVtkResult(unsigned cpart){
     if(VResCount>0)basefilename=GetResultsFileVtk(fun::PrintStr("_vres%02u", VResId));
     else basefilename=GetResultsFileVtk();
   #else
-    std::string basefilename=GetResultsFileVtk()
+    std::string basefilename=GetResultsFileVtk();
   #endif
   Log->AddFileInfo(fun::FileNameSec(basefilename,UINT_MAX),FileInfo);
   JSpVtkData::Save(fun::FileNameSec(basefilename,cpart),arrays,"Pos");
@@ -1907,7 +1907,7 @@ void JGaugeMesh::SaveVtkResult(unsigned cpart){
     if(VResCount>0)basefilename=GetResultsFileVtk(fun::PrintStr("_vres%02u", VResId));
     else basefilename=GetResultsFileVtk();
   #else
-    std::string basefilename=GetResultsFileVtk()
+    std::string basefilename=GetResultsFileVtk();
   #endif
   //-Saves VTK with npt size data.
   Log->AddFileInfo(fun::FileNameSec(basefilename,UINT_MAX),FileInfo);
@@ -1917,7 +1917,7 @@ void JGaugeMesh::SaveVtkResult(unsigned cpart){
     #ifdef _WITHMR
       std::string basefilenamezsurf=GetResultsFileVtk(fun::PrintStr("_Zsurf_vres%02u", VResId));
     #else
-      std::string basefilenamezsurf=GetResultsFileVtk("_Zsurf")
+      std::string basefilenamezsurf=GetResultsFileVtk("_Zsurf");
     #endif
     Log->AddFileInfo(fun::FileNameSec(basefilenamezsurf,UINT_MAX),FileInfo);
     jmsh::JMeshTDatasSave::SaveVtk(basefilenamezsurf,int(cpart),MeshDat,true);
@@ -2323,7 +2323,7 @@ void JGaugeForce::SaveVtkResult(unsigned cpart){
     if(VResCount>0)basefilename=GetResultsFileVtk(fun::PrintStr("_vres%02u", VResId));
     else basefilename=GetResultsFileVtk();
   #else
-    std::string basefilename=GetResultsFileVtk()
+    std::string basefilename=GetResultsFileVtk();
   #endif
   Log->AddFileInfo(fun::FileNameSec(basefilename,UINT_MAX),FileInfo);
   JSpVtkData::Save(fun::FileNameSec(basefilename,cpart),arrays,"Pos");

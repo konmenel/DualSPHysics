@@ -272,6 +272,7 @@ void JGaugeSystem::ReadXml(const JXml* sxml,TiXmlElement* lis,const JSphMk* mkin
 
         //-Common parameter for all gauges.
         //-Check if vresid is specified. 
+        #ifdef _WITHMR
         const unsigned vresid=(unsigned)sxml->ReadElementUnsigned(ele,"vres","id",true,UINT_MAX);
         if(vresid!=UINT_MAX && vresid>=VResCount)
           Run_ExceptioonFile("The id of variable resolution zone is invalid.",sxml->ErrGetFileRow(ele));
@@ -279,6 +280,8 @@ void JGaugeSystem::ReadXml(const JXml* sxml,TiXmlElement* lis,const JSphMk* mkin
           ele=ele->NextSiblingElement();
           continue;
         }
+        #endif // _WITHMR
+        
         //-Loads points
         //std::vector<tdouble3> points;
         //LoadPoints(sxml,ele,points);
